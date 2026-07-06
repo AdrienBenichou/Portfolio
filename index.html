@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="fr" data-lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Adrien Benichou — Sport &amp; Digital</title>
+<meta name="description" content="Portfolio d'Adrien Benichou, étudiant M2 International Sport &amp; Event Management, spécialisé CRM et Community Management.">
+
+<!-- Google Fonts : display face caractérielle + body face lisible -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Curseur custom (desktop only, géré/affiché en JS) -->
+  <div id="custom-cursor" aria-hidden="true"></div>
+
+  <!-- Switcher FR/EN, toujours accessible -->
+  <div class="lang-switcher" role="group" aria-label="Changer de langue">
+    <button type="button" class="lang-btn is-active" data-lang-btn="fr" aria-pressed="true">FR</button>
+    <button type="button" class="lang-btn" data-lang-btn="en" aria-pressed="false">EN</button>
+  </div>
+
+  <!-- ============ HERO ============ -->
+  <header id="hero" class="hero">
+    <div class="hero-intro">
+      <p class="eyebrow" data-i18n="hero.eyebrow">Sport × Digital</p>
+      <h1 class="hero-name">Adrien Benichou</h1>
+      <p class="hero-tagline" data-i18n="hero.tagline">
+        Je fais rimer performance sportive et stratégie digitale.
+      </p>
+    </div>
+
+    <!-- Photo : REMPLACER par la vraie photo (ou laisser le fallback Airtable "Photo") -->
+    <div class="hero-photo">
+      <img id="hero-photo-img" src="" alt="Photo d'Adrien Benichou" data-photo-placeholder="true">
+    </div>
+
+    <!-- ===== Cercle rotatif de navigation (signature visuelle) ===== -->
+    <div id="dial-wrapper" class="dial-wrapper">
+      <nav
+        id="dial-nav"
+        class="dial-nav"
+        role="listbox"
+        aria-label="Navigation principale"
+        aria-activedescendant="dial-option-apropos"
+        tabindex="0"
+      >
+        <div class="dial-track" id="dial-track">
+          <!-- data-angle défini/actualisé en JS -->
+          <button
+            type="button"
+            id="dial-option-apropos"
+            class="dial-option"
+            role="option"
+            aria-selected="true"
+            data-section="apropos"
+            data-angle="0"
+          >
+            <span data-i18n="nav.apropos">À propos de moi</span>
+          </button>
+          <button
+            type="button"
+            id="dial-option-projets"
+            class="dial-option"
+            role="option"
+            aria-selected="false"
+            data-section="projets"
+            data-angle="72"
+          >
+            <span data-i18n="nav.projets">Mes projets</span>
+          </button>
+          <button
+            type="button"
+            id="dial-option-softwares"
+            class="dial-option"
+            role="option"
+            aria-selected="false"
+            data-section="softwares"
+            data-angle="144"
+          >
+            <span data-i18n="nav.softwares">Softwares</span>
+          </button>
+          <button
+            type="button"
+            id="dial-option-diplomes"
+            class="dial-option"
+            role="option"
+            aria-selected="false"
+            data-section="diplomes"
+            data-angle="216"
+          >
+            <span data-i18n="nav.diplomes">Diplômes</span>
+          </button>
+          <button
+            type="button"
+            id="dial-option-benevolat"
+            class="dial-option"
+            role="option"
+            aria-selected="false"
+            data-section="benevolat"
+            data-angle="288"
+          >
+            <span data-i18n="nav.benevolat">Bénévolat</span>
+          </button>
+        </div>
+        <div class="dial-marker" aria-hidden="true"></div>
+      </nav>
+
+      <p class="dial-hint" data-i18n="hero.dialHint">
+        Fais tourner le cercle (glisser, molette, ou flèches ← →) et valide avec Entrée
+      </p>
+    </div>
+
+    <button type="button" class="dial-back-btn" id="dial-back-btn" data-i18n="nav.back" hidden>
+      Retour
+    </button>
+
+    <div class="scroll-indicator" aria-hidden="true">
+      <span></span>
+    </div>
+  </header>
+
+  <main id="main-content">
+
+    <!-- ============ À PROPOS ============ -->
+    <section id="apropos" class="section section-apropos" data-reveal>
+      <div class="section-inner">
+        <p class="eyebrow" data-i18n="apropos.eyebrow">Qui je suis</p>
+        <h2 data-i18n="apropos.title">À propos de moi</h2>
+
+        <p id="apropos-description" class="apropos-text">
+          <!-- injecté par main.js depuis data.json → table Moi → Description -->
+        </p>
+
+        <div class="apropos-meta">
+          <div class="meta-item">
+            <span class="meta-label" data-i18n="apropos.location">Lieu</span>
+            <span id="apropos-lieu" class="meta-value"></span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label" data-i18n="apropos.email">Contact</span>
+            <a id="apropos-mail" class="meta-value" href="#"></a>
+          </div>
+        </div>
+
+        <h3 class="subheading" data-i18n="apropos.timelineTitle">Parcours</h3>
+        <ol id="apropos-timeline" class="timeline" data-reveal-stagger>
+          <!-- items injectés par main.js -->
+        </ol>
+
+        <h3 class="subheading" data-i18n="apropos.skillsTitle">Compétences</h3>
+        <div id="apropos-skills" class="skills-groups">
+          <!-- groupes de compétences injectés par main.js, groupés par catégorie -->
+        </div>
+
+        <h3 class="subheading" data-i18n="apropos.languagesTitle">Langues</h3>
+        <div class="languages-grid">
+          <div class="language-item">
+            <span class="language-name">Français</span>
+            <span id="lang-fr" class="language-level"></span>
+          </div>
+          <div class="language-item">
+            <span class="language-name">English</span>
+            <span id="lang-en" class="language-level"></span>
+          </div>
+          <div class="language-item">
+            <span class="language-name">Deutsch</span>
+            <span id="lang-de" class="language-level"></span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ MES PROJETS ============ -->
+    <section id="projets" class="section section-projets" data-reveal>
+      <div class="section-inner">
+        <p class="eyebrow" data-i18n="projets.eyebrow">Ils m'ont fait confiance</p>
+        <h2 data-i18n="projets.title">Mes projets</h2>
+
+        <!-- Logos clients, visibles sans scroller -->
+        <ul id="projets-clients" class="clients-strip" aria-label="Entreprises et organisations">
+          <!-- injecté par main.js : AS Monaco, CNOSF, Paris 2024, Centre Français -->
+        </ul>
+
+        <!-- Filtre par type -->
+        <div class="projets-filters" role="group" aria-label="Filtrer les projets par type">
+          <button type="button" class="filter-btn is-active" data-filter="all" data-i18n="projets.filterAll">Tous</button>
+          <button type="button" class="filter-btn" data-filter="pro" data-i18n="projets.filterPro">Projets Pro</button>
+          <button type="button" class="filter-btn" data-filter="stage" data-i18n="projets.filterStage">Stage</button>
+          <button type="button" class="filter-btn" data-filter="job" data-i18n="projets.filterJob">Job étudiant</button>
+          <button type="button" class="filter-btn" data-filter="etudiant" data-i18n="projets.filterEtudiant">Projets étudiants</button>
+          <button type="button" class="filter-btn" data-filter="cesure" data-i18n="projets.filterCesure">Césure</button>
+        </div>
+
+        <div id="projets-grid" class="projets-grid" data-reveal-stagger>
+          <!-- cartes projets injectées par main.js -->
+        </div>
+      </div>
+    </section>
+
+    <!-- Modal projet immersif (template rempli dynamiquement) -->
+    <div id="projet-modal" class="projet-modal" role="dialog" aria-modal="true" aria-labelledby="projet-modal-title" hidden>
+      <div class="projet-modal-backdrop" data-modal-close></div>
+      <div class="projet-modal-content">
+        <button type="button" class="projet-modal-close" data-modal-close aria-label="Fermer">
+          <span aria-hidden="true">&times;</span>
+        </button>
+        <div class="projet-modal-cover">
+          <img id="projet-modal-img" src="" alt="">
+        </div>
+        <div class="projet-modal-body">
+          <p id="projet-modal-entreprise" class="projet-modal-entreprise"></p>
+          <h3 id="projet-modal-title" class="projet-modal-title"></h3>
+          <p id="projet-modal-dates" class="projet-modal-dates"></p>
+          <p id="projet-modal-description" class="projet-modal-description"></p>
+          <ul id="projet-modal-skills" class="projet-modal-skills" aria-label="Compétences mobilisées"></ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ SOFTWARES ============ -->
+    <section id="softwares" class="section section-softwares" data-reveal>
+      <div class="section-inner">
+        <p class="eyebrow" data-i18n="softwares.eyebrow">Ma boîte à outils</p>
+        <h2 data-i18n="softwares.title">Softwares</h2>
+
+        <div id="softwares-grid" class="softwares-grid" data-reveal-stagger>
+          <!-- groupé par Type, injecté par main.js -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ DIPLÔMES ============ -->
+    <section id="diplomes" class="section section-diplomes" data-reveal>
+      <div class="section-inner">
+        <p class="eyebrow" data-i18n="diplomes.eyebrow">Formation</p>
+        <h2 data-i18n="diplomes.title">Diplômes</h2>
+
+        <ol id="diplomes-timeline" class="timeline timeline-large" data-reveal-stagger>
+          <!-- injecté par main.js, trié par "Date pas texte" -->
+        </ol>
+      </div>
+    </section>
+
+    <!-- ============ BÉNÉVOLAT ============ -->
+    <section id="benevolat" class="section section-benevolat" data-reveal>
+      <div class="section-inner">
+        <p class="eyebrow" data-i18n="benevolat.eyebrow">Engagement</p>
+        <h2 data-i18n="benevolat.title">Bénévolat</h2>
+
+        <div id="benevolat-grid" class="benevolat-grid" data-reveal-stagger>
+          <!-- cartes injectées par main.js -->
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ============ CONTACT (hors cercle, scroll classique) ============ -->
+  <footer id="contact" class="section-contact">
+    <div class="contact-inner">
+      <h2 data-i18n="contact.title">Contact</h2>
+      <ul class="contact-links">
+        <li>
+          <a id="contact-mail" href="#" data-i18n-aria="contact.emailAria">
+            <span data-i18n="contact.email">Email</span>
+          </a>
+        </li>
+        <li>
+          <a href="https://www.linkedin.com/in/adrien-benichou" target="_blank" rel="noopener">
+            LinkedIn
+          </a>
+        </li>
+        <li>
+          <a href="https://github.com/AdrienBenichou" target="_blank" rel="noopener">
+            GitHub
+          </a>
+        </li>
+      </ul>
+      <p class="contact-footer-note">&copy; 2026 Adrien Benichou</p>
+    </div>
+  </footer>
+
+  <!-- AOS : lib d'animation légère pour les scroll-reveals -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.js"></script>
+
+  <script src="main.js" defer></script>
+</body>
+</html>
