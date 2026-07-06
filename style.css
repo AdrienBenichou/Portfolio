@@ -610,6 +610,9 @@ img { max-width: 100%; display: block; }
   justify-content: center;
   padding: 24px;
 }
+.projet-modal[hidden] {
+  display: none;
+}
 .projet-modal-backdrop {
   position: absolute;
   inset: 0;
