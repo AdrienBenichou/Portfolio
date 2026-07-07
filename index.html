@@ -50,6 +50,11 @@
         tabindex="0"
       >
         <div class="dial-track" id="dial-track">
+          <div class="dial-center" id="dial-center" aria-hidden="true">
+            <img id="dial-center-img" src="" alt="">
+            <div class="dial-center-overlay"></div>
+            <p id="dial-center-label" class="dial-center-label"></p>
+          </div>
           <!-- data-angle défini/actualisé en JS -->
           <button
             type="button"
@@ -196,8 +201,28 @@
           <button type="button" class="filter-btn" data-filter="cesure" data-i18n="projets.filterCesure">Césure</button>
         </div>
 
-        <div id="projets-grid" class="projets-grid" data-reveal-stagger>
-          <!-- cartes projets injectées par main.js -->
+        <div class="orbit-wrapper">
+          <div
+            id="projets-orbit"
+            class="orbit-nav"
+            role="listbox"
+            aria-label="Sélection de projet"
+            tabindex="0"
+          >
+            <div class="orbit-track" id="projets-orbit-track" data-reveal-stagger>
+              <!-- nœuds projets injectés par main.js -->
+            </div>
+            <div class="orbit-center" id="orbit-center" aria-hidden="true">
+              <img id="orbit-center-img" src="" alt="">
+              <div class="orbit-center-overlay"></div>
+              <div class="orbit-center-text">
+                <p id="orbit-center-cat" class="orbit-center-cat"></p>
+                <p id="orbit-center-title" class="orbit-center-title"></p>
+                <p id="orbit-center-meta" class="orbit-center-meta"></p>
+              </div>
+            </div>
+          </div>
+          <p class="orbit-hint" data-i18n="projets.orbitHint">Clique un projet pour l'ouvrir en plein écran</p>
         </div>
       </div>
     </section>
@@ -205,19 +230,30 @@
     <!-- Modal projet immersif (template rempli dynamiquement) -->
     <div id="projet-modal" class="projet-modal" role="dialog" aria-modal="true" aria-labelledby="projet-modal-title" hidden>
       <div class="projet-modal-backdrop" data-modal-close></div>
-      <div class="projet-modal-content">
-        <button type="button" class="projet-modal-close" data-modal-close aria-label="Fermer">
-          <span aria-hidden="true">&times;</span>
-        </button>
-        <div class="projet-modal-cover">
-          <img id="projet-modal-img" src="" alt="">
+      <div class="projet-modal-content" id="projet-modal-content">
+        <div class="projet-modal-topbar">
+          <p class="projet-modal-index">
+            <span id="projet-modal-index-current">1</span>&nbsp;/&nbsp;<span id="projet-modal-index-total">1</span>
+          </p>
+          <div class="projet-modal-nav">
+            <button type="button" class="projet-modal-arrow" id="projet-modal-prev" aria-label="Projet précédent">&larr;</button>
+            <button type="button" class="projet-modal-arrow" id="projet-modal-next" aria-label="Projet suivant">&rarr;</button>
+          </div>
+          <button type="button" class="projet-modal-close" data-modal-close aria-label="Fermer">
+            <span aria-hidden="true">&times;</span>
+          </button>
         </div>
-        <div class="projet-modal-body">
-          <p id="projet-modal-entreprise" class="projet-modal-entreprise"></p>
-          <h3 id="projet-modal-title" class="projet-modal-title"></h3>
-          <p id="projet-modal-dates" class="projet-modal-dates"></p>
-          <p id="projet-modal-description" class="projet-modal-description"></p>
-          <ul id="projet-modal-skills" class="projet-modal-skills" aria-label="Compétences mobilisées"></ul>
+        <div class="projet-modal-scroll" id="projet-modal-scroll">
+          <div class="projet-modal-cover">
+            <img id="projet-modal-img" src="" alt="">
+          </div>
+          <div class="projet-modal-body">
+            <p id="projet-modal-entreprise" class="projet-modal-entreprise"></p>
+            <h3 id="projet-modal-title" class="projet-modal-title"></h3>
+            <p id="projet-modal-dates" class="projet-modal-dates"></p>
+            <p id="projet-modal-description" class="projet-modal-description"></p>
+            <ul id="projet-modal-skills" class="projet-modal-skills" aria-label="Compétences mobilisées"></ul>
+          </div>
         </div>
       </div>
     </div>

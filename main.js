@@ -1,6 +1,7 @@
 /* ============================================
    main.js — Portfolio Adrien Benichou
-   Cercle rotatif, transitions, data Airtable (data.json), i18n, filtre, modal
+   Cercle rotatif hero, orbite projets + modal éditorial plein écran,
+   transitions, data Airtable (data.json), i18n, filtre
    ============================================ */
 
 (function () {
@@ -17,6 +18,11 @@
     isDragging: false,
     dragStartX: 0,
     dragStartAngle: 0,
+    lastInteraction: 0,
+    dialPaused: false,
+    reducedMotion: false,
+    idleRAF: null,
+    resizeRAF: null,
   };
 
   const ANGLE_STEP = 360 / SECTIONS.length;
@@ -42,6 +48,7 @@
       "apropos.languagesTitle": "Langues",
       "projets.eyebrow": "Ils m'ont fait confiance",
       "projets.title": "Mes projets",
+      "projets.orbitHint": "Clique un projet pour l'ouvrir en plein écran",
       "projets.filterAll": "Tous",
       "projets.filterPro": "Projets Pro",
       "projets.filterStage": "Stage",
@@ -76,6 +83,7 @@
       "apropos.languagesTitle": "Languages",
       "projets.eyebrow": "Trusted by",
       "projets.title": "My projects",
+      "projets.orbitHint": "Click a project to open it full screen",
       "projets.filterAll": "All",
       "projets.filterPro": "Pro projects",
       "projets.filterStage": "Internship",
@@ -115,6 +123,7 @@
           b.setAttribute("aria-pressed", isActive);
         });
         applyI18n();
+        updateDialCenterLabel(state.activeIndex);
       });
     });
   }
@@ -122,27 +131,62 @@
   /* ============ CURSEUR CUSTOM ============ */
   function initCustomCursor() {
     const cursor = document.getElementById("custom-cursor");
+    const hero = document.getElementById("hero");
     if (!cursor || !window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
 
     window.addEventListener("mousemove", (e) => {
       cursor.style.transform = `translate(${e.clientX}px, ${e.clientY}px) translate(-50%, -50%)`;
     });
 
-    document.querySelectorAll("a, button, .projet-card, .software-item").forEach((el) => {
-      el.addEventListener("mouseenter", () => cursor.classList.add("is-hover"));
-      el.addEventListener("mouseleave", () => cursor.classList.remove("is-hover"));
+    // Délégation : fonctionne aussi pour les nœuds d'orbite/dial injectés dynamiquement
+    document.addEventListener("mouseover", (e) => {
+      if (hero.contains(e.target)) cursor.classList.add("is-dark");
+
+      const dialOpt = e.target.closest(".dial-option");
+      const orbitNode = e.target.closest(".orbit-node");
+      const interactive = e.target.closest("a, button, .software-item, .orbit-node, .dial-option");
+
+      if (interactive) cursor.classList.add("is-hover");
+      if (dialOpt) {
+        cursor.classList.add("is-label");
+        cursor.setAttribute("data-cursor-label", "OUVRIR");
+      } else if (orbitNode) {
+        cursor.classList.add("is-label");
+        cursor.setAttribute("data-cursor-label", "VOIR");
+      }
+    });
+
+    document.addEventListener("mouseout", (e) => {
+      if (hero.contains(e.target) && !hero.contains(e.relatedTarget)) {
+        cursor.classList.remove("is-dark");
+      }
+      const interactive = e.target.closest("a, button, .software-item, .orbit-node, .dial-option");
+      if (interactive && !interactive.contains(e.relatedTarget)) {
+        cursor.classList.remove("is-hover");
+        cursor.classList.remove("is-label");
+        cursor.removeAttribute("data-cursor-label");
+      }
     });
   }
 
-  /* ============ CERCLE ROTATIF ============ */
+  /* ============ CERCLE ROTATIF HERO ============ */
+  // Miroir exact de la formule CSS de .hero (--dial-outer / --dial-size / --dial-label-gap)
+  // pour que le rayon utilisé par le JS corresponde toujours au rendu réel.
+  function getDialRadius() {
+    const outer = Math.max(220, Math.min(1000, window.innerHeight - 408, window.innerWidth * 0.66));
+    const ringSize = outer * 0.76;
+    const gap = outer * 0.062;
+    return ringSize / 2 + gap;
+  }
+
   function setDialAngle(angle) {
     state.currentAngle = angle;
-    document.getElementById("dial-track").style.setProperty("--dial-radius", "160px");
+    const radius = getDialRadius();
     document.querySelectorAll(".dial-option").forEach((opt) => {
       const baseAngle = parseFloat(opt.getAttribute("data-angle"));
       const finalAngle = baseAngle - angle;
       opt.style.setProperty("--angle", `${finalAngle}deg`);
-      opt.style.setProperty("--dial-radius", "160px");
+      opt.style.setProperty("--dial-radius", `${radius}px`);
     });
     updateActiveOption();
   }
@@ -171,6 +215,21 @@
     document
       .getElementById("dial-nav")
       .setAttribute("aria-activedescendant", options[closestIndex].id);
+
+    if (!state.isDragging) updateDialCenterLabel(closestIndex);
+  }
+
+  function updateDialCenterLabel(index) {
+    const options = document.querySelectorAll(".dial-option");
+    const opt = options[index];
+    const labelEl = document.getElementById("dial-center-label");
+    if (!opt || !labelEl) return;
+    const text = opt.querySelector("span").textContent;
+    const total = String(SECTIONS.length).padStart(2, "0");
+    const current = String(index + 1).padStart(2, "0");
+    // Sur cercle très compact (mobile), l'index alourdit un texte déjà court à afficher
+    labelEl.textContent = window.innerWidth <= 480 ? text : `${text} — ${current}/${total}`;
+    labelEl.classList.add("is-visible");
   }
 
   function rotateToIndex(index) {
@@ -178,9 +237,12 @@
     setDialAngle(targetAngle);
   }
 
+  function markInteraction() {
+    state.lastInteraction = performance.now();
+  }
+
   function initDial() {
     const nav = document.getElementById("dial-nav");
-    const track = document.getElementById("dial-track");
 
     setDialAngle(0);
 
@@ -189,6 +251,7 @@
       state.isDragging = true;
       state.dragStartX = e.clientX;
       state.dragStartAngle = state.currentAngle;
+      markInteraction();
       nav.setPointerCapture(e.pointerId);
     });
 
@@ -201,6 +264,7 @@
 
     nav.addEventListener("pointerup", () => {
       state.isDragging = false;
+      markInteraction();
       rotateToIndex(state.activeIndex);
     });
 
@@ -209,6 +273,7 @@
       "wheel",
       (e) => {
         e.preventDefault();
+        markInteraction();
         const direction = e.deltaY > 0 ? 1 : -1;
         rotateToIndex((state.activeIndex + direction + SECTIONS.length) % SECTIONS.length);
       },
@@ -219,14 +284,32 @@
     nav.addEventListener("keydown", (e) => {
       if (e.key === "ArrowRight") {
         e.preventDefault();
+        markInteraction();
         rotateToIndex((state.activeIndex + 1) % SECTIONS.length);
       } else if (e.key === "ArrowLeft") {
         e.preventDefault();
+        markInteraction();
         rotateToIndex((state.activeIndex - 1 + SECTIONS.length) % SECTIONS.length);
       } else if (e.key === "Enter") {
         e.preventDefault();
         confirmSelection();
       }
+    });
+
+    // Pause de la rotation idle au survol / focus du cercle
+    nav.addEventListener("mouseenter", () => {
+      state.dialPaused = true;
+    });
+    nav.addEventListener("mouseleave", () => {
+      state.dialPaused = false;
+      markInteraction();
+    });
+    nav.addEventListener("focusin", () => {
+      state.dialPaused = true;
+    });
+    nav.addEventListener("focusout", () => {
+      state.dialPaused = false;
+      markInteraction();
     });
 
     // Clic sur une option = confirmation directe si déjà active, sinon la centre
@@ -238,9 +321,15 @@
           rotateToIndex(i);
         }
       });
+      opt.addEventListener("mouseenter", () => updateDialCenterLabel(i));
+      opt.addEventListener("mouseleave", () => updateDialCenterLabel(state.activeIndex));
+      opt.addEventListener("focus", () => updateDialCenterLabel(i));
+      opt.addEventListener("blur", () => updateDialCenterLabel(state.activeIndex));
     });
 
     document.getElementById("dial-back-btn").addEventListener("click", collapseDialBack);
+
+    updateDialCenterLabel(0);
   }
 
   function confirmSelection() {
@@ -248,10 +337,46 @@
     triggerSectionTransition(sectionId);
   }
 
+  /* Rotation idle : très lente, en pause pendant le drag/hover/focus */
+  const IDLE_DELAY_MS = 2600;
+  const IDLE_TURN_MS = 38000;
+  function startIdleRotation() {
+    if (state.reducedMotion) return;
+    let prevTs = null;
+    function tick(ts) {
+      state.idleRAF = requestAnimationFrame(tick);
+      if (prevTs == null) prevTs = ts;
+      const dt = ts - prevTs;
+      prevTs = ts;
+      if (state.isDragging || state.dialPaused) return;
+      if (ts - state.lastInteraction < IDLE_DELAY_MS) return;
+      setDialAngle(state.currentAngle + (360 / IDLE_TURN_MS) * dt);
+    }
+    state.idleRAF = requestAnimationFrame(tick);
+  }
+
+  /* Parallaxe discrète du cercle selon la position de la souris */
+  function initDialParallax() {
+    if (state.reducedMotion || !window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+    const nav = document.getElementById("dial-nav");
+    const track = document.getElementById("dial-track");
+    nav.addEventListener("mousemove", (e) => {
+      const rect = nav.getBoundingClientRect();
+      const dx = ((e.clientX - (rect.left + rect.width / 2)) / (rect.width / 2)) * 6;
+      const dy = ((e.clientY - (rect.top + rect.height / 2)) / (rect.height / 2)) * 6;
+      track.style.setProperty("--parallax-x", `${dx}px`);
+      track.style.setProperty("--parallax-y", `${dy}px`);
+    });
+    nav.addEventListener("mouseleave", () => {
+      track.style.setProperty("--parallax-x", "0px");
+      track.style.setProperty("--parallax-y", "0px");
+    });
+  }
+
   /* ============ TRANSITION PLEIN ÉCRAN ============ */
   function triggerSectionTransition(sectionId) {
     const overlay = document.createElement("div");
-    overlay.className = "section-overlay is-active";
+    overlay.className = "section-overlay is-active section-overlay--hero";
     document.body.appendChild(overlay);
 
     setTimeout(() => {
@@ -332,6 +457,7 @@
 
     if (moi["Photo"] && moi["Photo"][0]) {
       document.getElementById("hero-photo-img").src = moi["Photo"][0].url;
+      document.getElementById("dial-center-img").src = moi["Photo"][0].url;
     }
 
     // Timeline : fusion Diplômes (contexte pro) — ici on utilise les tables projets/bénévolat comme parcours
@@ -367,7 +493,24 @@
       </div>`;
   }
 
-  /* ============ PROJETS ============ */
+  /* ============ PROJETS : ORBITE + MODAL ÉDITORIAL ============ */
+  // Miroir exact de la formule CSS de .orbit-nav (--orbit-outer / --orbit-size / --orbit-label-gap)
+  function getOrbitRadius() {
+    const outer = Math.max(240, Math.min(700, window.innerHeight * 0.74, window.innerWidth * 0.84));
+    const size = outer * 0.74;
+    const gap = outer * 0.058;
+    return size / 2 + gap;
+  }
+
+  const orbitState = {
+    projects: [],
+    activeIndex: 0,
+  };
+  const modalState = {
+    isOpen: false,
+    originNode: null,
+  };
+
   function getAllProjects() {
     const pro = (state.data.projetsPro || []).map((p) => ({ ...p, _cat: "pro" }));
     const stage = (state.data.projetsStage || []).map((p) => ({ ...p, _cat: "stage" }));
@@ -391,20 +534,19 @@
       .map((c) => `<li>${c}</li>`)
       .join("");
 
-    renderProjectsGrid();
+    renderOrbit();
 
     document.querySelectorAll(".filter-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
         document.querySelectorAll(".filter-btn").forEach((b) => b.classList.remove("is-active"));
         btn.classList.add("is-active");
         state.activeFilter = btn.getAttribute("data-filter");
-        renderProjectsGrid();
+        renderOrbit();
       });
     });
   }
 
-  function renderProjectsGrid() {
-    const grid = document.getElementById("projets-grid");
+  function renderOrbit() {
     let projects = getAllProjects();
 
     if (state.activeFilter !== "all") {
@@ -414,60 +556,258 @@
       });
     }
 
-    grid.innerHTML = projects
+    orbitState.projects = projects;
+    orbitState.activeIndex = 0;
+
+    const track = document.getElementById("projets-orbit-track");
+    const step = 360 / Math.max(projects.length, 1);
+
+    track.innerHTML = projects
       .map(
         (p, i) => `
-        <div class="projet-card" tabindex="0" data-project-index="${i}" data-project-cat="${p._cat}">
-          <span class="projet-card-tag">${p["Type de projet"] || ""}</span>
-          <img src="${projectCover(p)}" alt="${projectTitle(p)}" loading="lazy">
-          <div class="projet-card-overlay">
-            <p class="projet-card-title">${projectTitle(p)}</p>
-          </div>
-        </div>`
+        <button
+          type="button"
+          class="orbit-node"
+          data-index="${i}"
+          data-angle="${i * step}"
+          role="option"
+          aria-selected="false"
+        >
+          <span>${projectTitle(p)}</span>
+        </button>`
       )
       .join("");
 
-    grid.querySelectorAll(".projet-card").forEach((card, i) => {
-      const openModal = () => openProjectModal(projects[i]);
-      card.addEventListener("click", openModal);
-      card.addEventListener("keydown", (e) => {
+    applyOrbitLayout();
+
+    track.querySelectorAll(".orbit-node").forEach((node, i) => {
+      node.addEventListener("mouseenter", () => showOrbitPreview(i));
+      node.addEventListener("focus", () => showOrbitPreview(i));
+      node.addEventListener("mouseleave", () => showOrbitPreview(orbitState.activeIndex));
+      node.addEventListener("blur", () => showOrbitPreview(orbitState.activeIndex));
+      node.addEventListener("click", () => openProjectModal(i, node));
+      node.addEventListener("keydown", (e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          openModal();
+          openProjectModal(i, node);
         }
       });
     });
+
+    if (projects.length) showOrbitPreview(0);
   }
 
-  function openProjectModal(project) {
-    const modal = document.getElementById("projet-modal");
-    document.getElementById("projet-modal-img").src = projectCover(project);
-    document.getElementById("projet-modal-title").textContent = projectTitle(project);
-    document.getElementById("projet-modal-entreprise").textContent = project["Entreprise"] || "";
-    document.getElementById("projet-modal-dates").textContent = project["Date"] || "";
-    document.getElementById("projet-modal-description").textContent = project["Description"] || "";
+  function applyOrbitLayout() {
+    const radius = getOrbitRadius();
+    document.querySelectorAll(".orbit-node").forEach((node) => {
+      node.style.setProperty("--angle", `${node.getAttribute("data-angle")}deg`);
+      node.style.setProperty("--radius", `${radius}px`);
+    });
+  }
+
+  function showOrbitPreview(index) {
+    const project = orbitState.projects[index];
+    if (!project) return;
+
+    document.querySelectorAll(".orbit-node").forEach((node, i) => {
+      const isActive = i === orbitState.activeIndex;
+      node.classList.toggle("is-active", isActive);
+      node.setAttribute("aria-selected", String(isActive));
+    });
+
+    const img = document.getElementById("orbit-center-img");
+    const cover = projectCover(project);
+    if (cover) {
+      img.src = cover;
+      img.alt = projectTitle(project);
+      img.classList.add("is-visible");
+    } else {
+      img.classList.remove("is-visible");
+    }
+
+    document.getElementById("orbit-center-cat").textContent = project["Type de projet"] || "";
+    document.getElementById("orbit-center-title").textContent = projectTitle(project);
+    document.getElementById("orbit-center-meta").textContent = [project["Entreprise"], project["Date"]]
+      .filter(Boolean)
+      .join(" · ");
+    document.querySelector(".orbit-center-text").classList.add("is-visible");
+  }
+
+  /* ---- Modal éditorial plein écran (ouverture "shared element" depuis le nœud cliqué) ---- */
+  function getModalEls() {
+    return {
+      modal: document.getElementById("projet-modal"),
+      content: document.getElementById("projet-modal-content"),
+      scroll: document.getElementById("projet-modal-scroll"),
+      img: document.getElementById("projet-modal-img"),
+      entreprise: document.getElementById("projet-modal-entreprise"),
+      title: document.getElementById("projet-modal-title"),
+      dates: document.getElementById("projet-modal-dates"),
+      description: document.getElementById("projet-modal-description"),
+      skills: document.getElementById("projet-modal-skills"),
+      indexCurrent: document.getElementById("projet-modal-index-current"),
+      indexTotal: document.getElementById("projet-modal-index-total"),
+      prevBtn: document.getElementById("projet-modal-prev"),
+      nextBtn: document.getElementById("projet-modal-next"),
+    };
+  }
+
+  function fillModalContent(project, index) {
+    const els = getModalEls();
+    els.img.src = projectCover(project);
+    els.img.alt = projectTitle(project);
+    els.title.textContent = projectTitle(project);
+    els.entreprise.textContent = project["Entreprise"] || "";
+    els.dates.textContent = project["Date"] || "";
+    els.description.textContent = project["Description"] || "";
 
     const skills = project["Compétences"];
-    document.getElementById("projet-modal-skills").innerHTML = Array.isArray(skills)
-      ? skills.map((s) => `<li>${s}</li>`).join("")
-      : "";
+    els.skills.innerHTML = Array.isArray(skills) ? skills.map((s) => `<li>${s}</li>`).join("") : "";
 
-    modal.hidden = false;
+    els.indexCurrent.textContent = index + 1;
+    els.indexTotal.textContent = orbitState.projects.length;
+    els.prevBtn.disabled = orbitState.projects.length <= 1;
+    els.nextBtn.disabled = orbitState.projects.length <= 1;
+    els.scroll.scrollTop = 0;
+  }
+
+  function flipOpen(content, fromRect) {
+    const toRect = content.getBoundingClientRect();
+    const dx = fromRect.left + fromRect.width / 2 - (toRect.left + toRect.width / 2);
+    const dy = fromRect.top + fromRect.height / 2 - (toRect.top + toRect.height / 2);
+    const scaleX = fromRect.width / toRect.width;
+    const scaleY = fromRect.height / toRect.height;
+
+    content.style.transition = "none";
+    content.style.opacity = "0.4";
+    content.style.transform = `translate(${dx}px, ${dy}px) scale(${scaleX}, ${scaleY})`;
+    // force reflow avant de lancer la transition
+    // eslint-disable-next-line no-unused-expressions
+    content.offsetHeight;
+    content.style.transition = "transform 0.42s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease-out";
+    content.style.transform = "translate(0, 0) scale(1, 1)";
+    content.style.opacity = "1";
+  }
+
+  function openProjectModal(index, originNode) {
+    const project = orbitState.projects[index];
+    if (!project) return;
+
+    orbitState.activeIndex = index;
+    showOrbitPreview(index);
+
+    const els = getModalEls();
+    fillModalContent(project, index);
+
+    modalState.isOpen = true;
+    modalState.originNode = originNode || null;
+    els.modal.hidden = false;
     document.body.style.overflow = "hidden";
+
+    if (state.reducedMotion) {
+      requestAnimationFrame(() => els.modal.classList.add("is-open"));
+      return;
+    }
+
+    const fromRect = (originNode || els.content).getBoundingClientRect();
+    requestAnimationFrame(() => {
+      els.modal.classList.add("is-open");
+      flipOpen(els.content, fromRect);
+    });
   }
 
   function closeProjectModal() {
-    document.getElementById("projet-modal").hidden = true;
-    document.body.style.overflow = "";
+    if (!modalState.isOpen) return;
+    const els = getModalEls();
+    const originNode =
+      document.querySelector(`.orbit-node[data-index="${orbitState.activeIndex}"]`) || modalState.originNode;
+
+    els.modal.classList.remove("is-open");
+
+    if (state.reducedMotion || !originNode) {
+      els.modal.hidden = true;
+      document.body.style.overflow = "";
+      modalState.isOpen = false;
+      return;
+    }
+
+    const toRect = originNode.getBoundingClientRect();
+    const fromRect = els.content.getBoundingClientRect();
+    const dx = toRect.left + toRect.width / 2 - (fromRect.left + fromRect.width / 2);
+    const dy = toRect.top + toRect.height / 2 - (fromRect.top + fromRect.height / 2);
+    const scaleX = toRect.width / fromRect.width;
+    const scaleY = toRect.height / fromRect.height;
+
+    els.content.style.transition = "transform 0.32s cubic-bezier(0.6, 0, 0.8, 0.2), opacity 0.28s ease-in";
+    els.content.style.transform = `translate(${dx}px, ${dy}px) scale(${scaleX}, ${scaleY})`;
+    els.content.style.opacity = "0.3";
+
+    const onEnd = () => {
+      els.modal.hidden = true;
+      document.body.style.overflow = "";
+      els.content.style.transition = "none";
+      els.content.style.transform = "";
+      els.content.style.opacity = "";
+      modalState.isOpen = false;
+      els.content.removeEventListener("transitionend", onEnd);
+    };
+    els.content.addEventListener("transitionend", onEnd);
+  }
+
+  function navigateProject(delta) {
+    if (!modalState.isOpen || orbitState.projects.length <= 1) return;
+    const total = orbitState.projects.length;
+    const newIndex = (orbitState.activeIndex + delta + total) % total;
+    const els = getModalEls();
+    const direction = delta > 0 ? "is-swiping-next" : "is-swiping-prev";
+
+    els.content.classList.add(direction);
+    window.setTimeout(() => {
+      orbitState.activeIndex = newIndex;
+      showOrbitPreview(newIndex);
+      fillModalContent(orbitState.projects[newIndex], newIndex);
+      els.content.classList.remove(direction);
+    }, 220);
   }
 
   function initModal() {
+    const els = getModalEls();
+
     document.querySelectorAll("[data-modal-close]").forEach((el) => {
       el.addEventListener("click", closeProjectModal);
     });
+    els.prevBtn.addEventListener("click", () => navigateProject(-1));
+    els.nextBtn.addEventListener("click", () => navigateProject(1));
+
     document.addEventListener("keydown", (e) => {
+      if (!modalState.isOpen) return;
       if (e.key === "Escape") closeProjectModal();
+      else if (e.key === "ArrowRight") navigateProject(1);
+      else if (e.key === "ArrowLeft") navigateProject(-1);
     });
+
+    // Swipe horizontal (mobile / tablette)
+    let touchStartX = 0;
+    let touchStartY = 0;
+    els.content.addEventListener(
+      "touchstart",
+      (e) => {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+      },
+      { passive: true }
+    );
+    els.content.addEventListener(
+      "touchend",
+      (e) => {
+        const dx = e.changedTouches[0].clientX - touchStartX;
+        const dy = e.changedTouches[0].clientY - touchStartY;
+        if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+          navigateProject(dx < 0 ? 1 : -1);
+        }
+      },
+      { passive: true }
+    );
   }
 
   /* ============ SOFTWARES ============ */
@@ -569,15 +909,32 @@
     }
   }
 
+  /* ============ RESIZE ============ */
+  function initResizeHandling() {
+    window.addEventListener("resize", () => {
+      cancelAnimationFrame(state.resizeRAF);
+      state.resizeRAF = requestAnimationFrame(() => {
+        setDialAngle(state.currentAngle);
+        applyOrbitLayout();
+      });
+    });
+  }
+
   /* ============ INIT ============ */
   document.addEventListener("DOMContentLoaded", () => {
+    state.reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    state.lastInteraction = performance.now();
+
     applyI18n();
     initLangSwitcher();
     initCustomCursor();
     initDial();
+    initDialParallax();
+    startIdleRotation();
     initScrollCollapse();
     initModal();
     initScrollReveals();
+    initResizeHandling();
     loadData().then(renderContact);
   });
 })();
