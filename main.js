@@ -450,9 +450,10 @@
     setText("lang-de", moi["Allemand"]);
 
     const mailEl = document.getElementById("apropos-mail");
-    if (moi["Mail"]) {
-      mailEl.textContent = moi["Mail"];
-      mailEl.href = `mailto:${moi["Mail"]}`;
+    const email = moi["Email"] || moi["Mail"];
+    if (email) {
+      mailEl.textContent = email;
+      mailEl.href = `mailto:${email}`;
     }
 
     if (moi["Photo"] && moi["Photo"][0]) {
@@ -460,19 +461,22 @@
       document.getElementById("dial-center-img").src = moi["Photo"][0].url;
     }
 
-    // Timeline : fusion Diplômes (contexte pro) — ici on utilise les tables projets/bénévolat comme parcours
+    // Timeline : expériences "terrain" (pro/stage/job/césure) triées de la plus récente à la plus ancienne
     const timelineEl = document.getElementById("apropos-timeline");
     const experiences = [
-      ...(state.data.projetsStage || []),
       ...(state.data.projetsPro || []),
-    ];
+      ...(state.data.projetsStage || []),
+      ...(state.data.projetsJob || []),
+      ...(state.data.projetsCesure || []),
+    ].sort((a, b) => new Date(b["Date"] || 0) - new Date(a["Date"] || 0));
+
     timelineEl.innerHTML = experiences
       .map(
         (exp) => `
         <li class="timeline-item">
-          <p class="timeline-date">${exp["Date"] || ""}</p>
-          <p class="timeline-title">${exp["Titre du post"] || exp["Nom du projet"] || ""}</p>
-          <p class="timeline-desc">${exp["Entreprise"] || ""}</p>
+          <p class="timeline-date">${projectDateText(exp)}</p>
+          <p class="timeline-title">${projectTitle(exp)}</p>
+          <p class="timeline-desc">${projectByline(exp)}</p>
         </li>`
       )
       .join("");
@@ -514,18 +518,44 @@
   function getAllProjects() {
     const pro = (state.data.projetsPro || []).map((p) => ({ ...p, _cat: "pro" }));
     const stage = (state.data.projetsStage || []).map((p) => ({ ...p, _cat: "stage" }));
+    const job = (state.data.projetsJob || []).map((p) => ({ ...p, _cat: "job" }));
+    const cesure = (state.data.projetsCesure || []).map((p) => ({ ...p, _cat: "cesure" }));
     const etudiant = (state.data.projetsEtudiant || []).map((p) => ({ ...p, _cat: "etudiant" }));
-    return [...pro, ...stage, ...etudiant];
+    return [...pro, ...stage, ...job, ...cesure, ...etudiant];
   }
 
+  // Le nom exact du champ "titre" varie légèrement entre tables Airtable ;
+  // on essaie toutes les variantes rencontrées plutôt que de supposer une seule table.
   function projectTitle(p) {
-    return p["Nom du projet"] || p["Titre du post"] || p["Titre du projet"] || "Projet";
+    return p["Titre"] || p["Nom du projet"] || p["Titre du projet"] || p["Titre du post"] || "Projet";
   }
 
   function projectCover(p) {
     const cover = p["Cover"] || p["Photo"] || p["Photos"];
     if (Array.isArray(cover) && cover[0]) return cover[0].url;
     return "";
+  }
+
+  // Idem pour la date affichée : certaines tables ont "Date text"/"Date Texte", d'autres "Date (texte)".
+  function projectDateText(p) {
+    return p["Date text"] || p["Date Text"] || p["Date Texte"] || p["Date (texte)"] || p["Date"] || "";
+  }
+
+  // Les tables pro/stage/job/césure ont "Entreprise" ; la table académique a "Etude" à la place.
+  function projectByline(p) {
+    return p["Entreprise"] || p["Etude"] || "";
+  }
+
+  const CATEGORY_I18N_KEY = {
+    pro: "projets.filterPro",
+    stage: "projets.filterStage",
+    job: "projets.filterJob",
+    cesure: "projets.filterCesure",
+    etudiant: "projets.filterEtudiant",
+  };
+  function categoryLabel(cat) {
+    const key = CATEGORY_I18N_KEY[cat];
+    return key ? I18N[state.lang][key] : "";
   }
 
   function renderProjets() {
@@ -550,10 +580,7 @@
     let projects = getAllProjects();
 
     if (state.activeFilter !== "all") {
-      projects = projects.filter((p) => {
-        const type = (p["Type de projet"] || "").toLowerCase();
-        return type.includes(state.activeFilter) || p._cat === state.activeFilter;
-      });
+      projects = projects.filter((p) => p._cat === state.activeFilter);
     }
 
     orbitState.projects = projects;
@@ -625,9 +652,9 @@
       img.classList.remove("is-visible");
     }
 
-    document.getElementById("orbit-center-cat").textContent = project["Type de projet"] || "";
+    document.getElementById("orbit-center-cat").textContent = categoryLabel(project._cat);
     document.getElementById("orbit-center-title").textContent = projectTitle(project);
-    document.getElementById("orbit-center-meta").textContent = [project["Entreprise"], project["Date"]]
+    document.getElementById("orbit-center-meta").textContent = [projectByline(project), projectDateText(project)]
       .filter(Boolean)
       .join(" · ");
     document.querySelector(".orbit-center-text").classList.add("is-visible");
@@ -657,8 +684,8 @@
     els.img.src = projectCover(project);
     els.img.alt = projectTitle(project);
     els.title.textContent = projectTitle(project);
-    els.entreprise.textContent = project["Entreprise"] || "";
-    els.dates.textContent = project["Date"] || "";
+    els.entreprise.textContent = projectByline(project);
+    els.dates.textContent = projectDateText(project);
     els.description.textContent = project["Description"] || "";
 
     const skills = project["Compétences"];
@@ -812,7 +839,7 @@
 
   /* ============ SOFTWARES ============ */
   function renderSoftwares() {
-    const softwares = state.data.softwares || [];
+    const softwares = [...(state.data.softwares || [])].sort((a, b) => (a["Rang"] || 0) - (b["Rang"] || 0));
     const grouped = {};
     softwares.forEach((sw) => {
       const type = sw["Type"] || "Autres";
@@ -841,8 +868,8 @@
   /* ============ DIPLÔMES ============ */
   function renderDiplomes() {
     const diplomes = [...(state.data.diplomes || [])].sort((a, b) => {
-      const dateA = new Date(a["Date pas texte"] || 0);
-      const dateB = new Date(b["Date pas texte"] || 0);
+      const dateA = new Date(a["Date"] || a["Date pas texte"] || 0);
+      const dateB = new Date(b["Date"] || b["Date pas texte"] || 0);
       return dateA - dateB;
     });
 
@@ -867,7 +894,7 @@
         <div class="benevolat-card">
           <span class="benevolat-card-tag">${b["Etiquette"] || ""}</span>
           <p class="benevolat-card-mission">${b["Mission"] || ""}</p>
-          <p class="benevolat-card-meta">${b["Lieu"] || ""} · ${b["Date"] || ""}</p>
+          <p class="benevolat-card-meta">${b["Lieu"] || ""} · ${b["Date (texte)"] || b["Date"] || ""}</p>
           <p class="benevolat-card-desc">${b["Description"] || ""}</p>
         </div>`
       )
@@ -878,8 +905,9 @@
   function renderContact() {
     const moi = (state.data && state.data.moi && state.data.moi[0]) || {};
     const contactMail = document.getElementById("contact-mail");
-    if (moi["Mail"]) {
-      contactMail.href = `mailto:${moi["Mail"]}`;
+    const email = moi["Email"] || moi["Mail"];
+    if (email) {
+      contactMail.href = `mailto:${email}`;
     }
   }
 

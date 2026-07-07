@@ -33,6 +33,8 @@ const TABLES = {
   benevolat: "Bénévolat",
   projetsPro: "Mes Projets (Projets Pro)",
   projetsStage: "Mes Projets (Stage)",
+  projetsJob: "Mes Projets (Job étudiant)",
+  projetsCesure: "Mes Projets (Césure)",
   projetsEtudiant: "Mes Projets (Projets étudiant)",
 };
 
