@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="fr" data-lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Diplômes — Adrien Benichou</title>
+<meta name="description" content="Portfolio d'Adrien Benichou, étudiant M2 International Sport &amp; Event Management, spécialisé CRM et Community Management.">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="style.css">
+</head>
+<body data-page="diplomes">
+
+  <div id="custom-cursor" aria-hidden="true"></div>
+
+  <div class="lang-switcher" role="group" aria-label="Changer de langue">
+    <button type="button" class="lang-btn is-active" data-lang-btn="fr" aria-pressed="true">FR</button>
+    <button type="button" class="lang-btn" data-lang-btn="en" aria-pressed="false">EN</button>
+  </div>
+
+  <nav class="page-nav" aria-label="Navigation site">
+    <a href="index.html" class="page-nav-link" data-i18n="nav.home">&larr; Accueil</a>
+    <a href="contact.html" class="page-nav-link" data-i18n="contact.title">Contact</a>
+  </nav>
+
+  <main id="main-content">
+
+    <!-- ============ DIPLÔMES ============ -->
+    <section id="diplomes" class="section section-diplomes" data-reveal>
+      <div class="section-inner">
+        <p class="eyebrow" data-i18n="diplomes.eyebrow">Formation</p>
+        <h2 data-i18n="diplomes.title">Diplômes</h2>
+
+        <ol id="diplomes-timeline" class="timeline timeline-large" data-reveal-stagger>
+          <!-- injecté par main.js, trié par "Date pas texte" -->
+        </ol>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- AOS : lib d'animation légère pour les scroll-reveals -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.js"></script>
+
+  <script src="main.js" defer></script>
+</body>
+</html>

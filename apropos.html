@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="fr" data-lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>À propos de moi — Adrien Benichou</title>
+<meta name="description" content="Portfolio d'Adrien Benichou, étudiant M2 International Sport &amp; Event Management, spécialisé CRM et Community Management.">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="style.css">
+</head>
+<body data-page="apropos">
+
+  <div id="custom-cursor" aria-hidden="true"></div>
+
+  <div class="lang-switcher" role="group" aria-label="Changer de langue">
+    <button type="button" class="lang-btn is-active" data-lang-btn="fr" aria-pressed="true">FR</button>
+    <button type="button" class="lang-btn" data-lang-btn="en" aria-pressed="false">EN</button>
+  </div>
+
+  <nav class="page-nav" aria-label="Navigation site">
+    <a href="index.html" class="page-nav-link" data-i18n="nav.home">&larr; Accueil</a>
+    <a href="contact.html" class="page-nav-link" data-i18n="contact.title">Contact</a>
+  </nav>
+
+  <main id="main-content">
+
+    <!-- ============ À PROPOS ============ -->
+    <section id="apropos" class="section section-apropos" data-reveal>
+      <div class="section-inner">
+        <div class="apropos-header">
+          <!-- Photo : REMPLACER par la vraie photo (ou laisser le fallback Airtable "Photo") -->
+          <div class="apropos-photo">
+            <img id="hero-photo-img" src="" alt="Photo d'Adrien Benichou" data-photo-placeholder="true">
+          </div>
+          <div class="apropos-header-text">
+            <p class="eyebrow" data-i18n="hero.eyebrow">Sport × Digital</p>
+            <h1 class="apropos-name">Adrien Benichou</h1>
+            <p class="apropos-tagline" data-i18n="hero.tagline">
+              Je fais rimer performance sportive et stratégie digitale.
+            </p>
+          </div>
+        </div>
+
+        <p class="eyebrow" data-i18n="apropos.eyebrow">Qui je suis</p>
+        <h2 data-i18n="apropos.title">À propos de moi</h2>
+
+        <p id="apropos-description" class="apropos-text">
+          <!-- injecté par main.js depuis data.json → table Moi → Description -->
+        </p>
+
+        <div class="apropos-meta">
+          <div class="meta-item">
+            <span class="meta-label" data-i18n="apropos.location">Lieu</span>
+            <span id="apropos-lieu" class="meta-value"></span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label" data-i18n="apropos.email">Contact</span>
+            <a id="apropos-mail" class="meta-value" href="#"></a>
+          </div>
+        </div>
+
+        <h3 class="subheading" data-i18n="apropos.timelineTitle">Parcours</h3>
+        <ol id="apropos-timeline" class="timeline" data-reveal-stagger>
+          <!-- items injectés par main.js -->
+        </ol>
+
+        <h3 class="subheading" data-i18n="apropos.skillsTitle">Compétences</h3>
+        <div id="apropos-skills" class="skills-groups">
+          <!-- groupes de compétences injectés par main.js, groupés par catégorie -->
+        </div>
+
+        <h3 class="subheading" data-i18n="apropos.languagesTitle">Langues</h3>
+        <div class="languages-grid">
+          <div class="language-item">
+            <span class="language-name">Français</span>
+            <span id="lang-fr" class="language-level"></span>
+          </div>
+          <div class="language-item">
+            <span class="language-name">English</span>
+            <span id="lang-en" class="language-level"></span>
+          </div>
+          <div class="language-item">
+            <span class="language-name">Deutsch</span>
+            <span id="lang-de" class="language-level"></span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- AOS : lib d'animation légère pour les scroll-reveals -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.js"></script>
+
+  <script src="main.js" defer></script>
+</body>
+</html>

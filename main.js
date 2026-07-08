@@ -1,44 +1,41 @@
 /* ============================================
    main.js — Portfolio Adrien Benichou
-   Cercle rotatif hero, orbite projets + modal éditorial plein écran,
-   transitions, data Airtable (data.json), i18n, filtre
+   Cylindre rotatif (nav d'accueil + showcase projets), orbite projets
+   + modal éditorial plein écran, données Airtable (data.json), i18n, filtre
    ============================================ */
 
 (function () {
   "use strict";
 
   /* ============ ÉTAT GLOBAL ============ */
-  const SECTIONS = ["apropos", "projets", "softwares", "diplomes", "benevolat"];
   const state = {
     lang: "fr",
-    currentAngle: 0,
-    activeIndex: 0,
     data: null,
     activeFilter: "all",
-    isDragging: false,
-    dragStartX: 0,
-    dragStartAngle: 0,
-    lastInteraction: 0,
-    dialPaused: false,
     reducedMotion: false,
-    idleRAF: null,
     resizeRAF: null,
   };
 
-  const ANGLE_STEP = 360 / SECTIONS.length;
+  /* ============ NAVIGATION PRINCIPALE (cylindre de la page d'accueil) ============ */
+  const NAV_SECTIONS = [
+    { labelKey: "nav.apropos", href: "apropos.html", tint: "#1B4FDB" },
+    { labelKey: "nav.projets", href: "projets.html", tint: "#FF6B35" },
+    { labelKey: "nav.softwares", href: "softwares.html", tint: "#0E7C86" },
+    { labelKey: "nav.diplomes", href: "diplomes.html", tint: "#12379E" },
+    { labelKey: "nav.benevolat", href: "benevolat.html", tint: "#E91E8C" },
+  ];
 
   /* ============ TRADUCTIONS (labels d'interface uniquement) ============ */
   const I18N = {
     fr: {
       "hero.eyebrow": "Sport × Digital",
       "hero.tagline": "Je fais rimer performance sportive et stratégie digitale.",
-      "hero.dialHint": "Fais tourner le cercle (glisser, molette, ou flèches ← →) et valide avec Entrée",
       "nav.apropos": "À propos de moi",
       "nav.projets": "Mes projets",
       "nav.softwares": "Softwares",
       "nav.diplomes": "Diplômes",
       "nav.benevolat": "Bénévolat",
-      "nav.back": "Retour",
+      "nav.home": "← Accueil",
       "apropos.eyebrow": "Qui je suis",
       "apropos.title": "À propos de moi",
       "apropos.location": "Lieu",
@@ -67,13 +64,12 @@
     en: {
       "hero.eyebrow": "Sport × Digital",
       "hero.tagline": "Where athletic performance meets digital strategy.",
-      "hero.dialHint": "Spin the dial (drag, scroll, or ← → keys) and press Enter to confirm",
       "nav.apropos": "About me",
       "nav.projets": "My projects",
       "nav.softwares": "Softwares",
       "nav.diplomes": "Degrees",
       "nav.benevolat": "Volunteering",
-      "nav.back": "Back",
+      "nav.home": "← Home",
       "apropos.eyebrow": "Who I am",
       "apropos.title": "About me",
       "apropos.location": "Location",
@@ -123,7 +119,7 @@
           b.setAttribute("aria-pressed", isActive);
         });
         applyI18n();
-        updateDialCenterLabel(state.activeIndex);
+        updateReelLabelFromPosition();
       });
     });
   }
@@ -138,30 +134,27 @@
       cursor.style.transform = `translate(${e.clientX}px, ${e.clientY}px) translate(-50%, -50%)`;
     });
 
-    // Délégation : fonctionne aussi pour les nœuds d'orbite/dial injectés dynamiquement
+    // Délégation : fonctionne aussi pour les nœuds d'orbite/cylindre injectés dynamiquement
     document.addEventListener("mouseover", (e) => {
-      if (hero.contains(e.target)) cursor.classList.add("is-dark");
+      if (hero && hero.contains(e.target)) cursor.classList.add("is-dark");
 
-      const dialOpt = e.target.closest(".dial-option");
       const orbitNode = e.target.closest(".orbit-node");
       const reelSlide = e.target.closest(".reel-slide");
-      const interactive = e.target.closest("a, button, .software-item, .orbit-node, .dial-option, .reel-slide");
+      const interactive = e.target.closest("a, button, .software-item, .orbit-node, .reel-slide");
 
       if (interactive) cursor.classList.add("is-hover");
-      if (dialOpt) {
+      if (orbitNode || reelSlide) {
         cursor.classList.add("is-label");
-        cursor.setAttribute("data-cursor-label", "OUVRIR");
-      } else if (orbitNode || reelSlide) {
-        cursor.classList.add("is-label");
-        cursor.setAttribute("data-cursor-label", "VOIR");
+        const isNav = reelSlide && reelSlide.classList.contains("reel-slide--nav");
+        cursor.setAttribute("data-cursor-label", isNav ? "OUVRIR" : "VOIR");
       }
     });
 
     document.addEventListener("mouseout", (e) => {
-      if (hero.contains(e.target) && !hero.contains(e.relatedTarget)) {
+      if (hero && hero.contains(e.target) && !hero.contains(e.relatedTarget)) {
         cursor.classList.remove("is-dark");
       }
-      const interactive = e.target.closest("a, button, .software-item, .orbit-node, .dial-option, .reel-slide");
+      const interactive = e.target.closest("a, button, .software-item, .orbit-node, .reel-slide");
       if (interactive && !interactive.contains(e.relatedTarget)) {
         cursor.classList.remove("is-hover");
         cursor.classList.remove("is-label");
@@ -170,214 +163,11 @@
     });
   }
 
-  /* ============ CERCLE ROTATIF HERO ============ */
-  // Miroir exact de la formule CSS de .hero (--dial-outer / --dial-size / --dial-label-gap)
-  // pour que le rayon utilisé par le JS corresponde toujours au rendu réel.
-  function getDialRadius() {
-    const outer = Math.max(220, Math.min(1000, window.innerHeight - 620, window.innerWidth * 0.66));
-    const ringSize = outer * 0.76;
-    const gap = outer * 0.062;
-    return ringSize / 2 + gap;
-  }
-
-  function setDialAngle(angle) {
-    state.currentAngle = angle;
-    const radius = getDialRadius();
-    document.querySelectorAll(".dial-option").forEach((opt) => {
-      const baseAngle = parseFloat(opt.getAttribute("data-angle"));
-      const finalAngle = baseAngle - angle;
-      opt.style.setProperty("--angle", `${finalAngle}deg`);
-      opt.style.setProperty("--dial-radius", `${radius}px`);
-    });
-    updateActiveOption();
-  }
-
-  function updateActiveOption() {
-    // L'option "active" = celle dont l'angle final est le plus proche de 0 (12h)
-    let closestIndex = 0;
-    let closestDelta = Infinity;
-
-    document.querySelectorAll(".dial-option").forEach((opt, i) => {
-      const baseAngle = parseFloat(opt.getAttribute("data-angle"));
-      let finalAngle = (baseAngle - state.currentAngle) % 360;
-      if (finalAngle > 180) finalAngle -= 360;
-      if (finalAngle < -180) finalAngle += 360;
-      const delta = Math.abs(finalAngle);
-      if (delta < closestDelta) {
-        closestDelta = delta;
-        closestIndex = i;
-      }
-      opt.setAttribute("aria-selected", "false");
-    });
-
-    state.activeIndex = closestIndex;
-    const options = document.querySelectorAll(".dial-option");
-    options[closestIndex].setAttribute("aria-selected", "true");
-    document
-      .getElementById("dial-nav")
-      .setAttribute("aria-activedescendant", options[closestIndex].id);
-
-    if (!state.isDragging) updateDialCenterLabel(closestIndex);
-  }
-
-  function updateDialCenterLabel(index) {
-    const options = document.querySelectorAll(".dial-option");
-    const opt = options[index];
-    const labelEl = document.getElementById("dial-center-label");
-    if (!opt || !labelEl) return;
-    const text = opt.querySelector("span").textContent;
-    const total = String(SECTIONS.length).padStart(2, "0");
-    const current = String(index + 1).padStart(2, "0");
-    // Sur cercle très compact (mobile), l'index alourdit un texte déjà court à afficher
-    labelEl.textContent = window.innerWidth <= 480 ? text : `${text} — ${current}/${total}`;
-    labelEl.classList.add("is-visible");
-  }
-
-  function rotateToIndex(index) {
-    const targetAngle = -index * ANGLE_STEP;
-    setDialAngle(targetAngle);
-  }
-
-  function markInteraction() {
-    state.lastInteraction = performance.now();
-  }
-
-  function initDial() {
-    const nav = document.getElementById("dial-nav");
-
-    setDialAngle(0);
-
-    // Drag souris
-    nav.addEventListener("pointerdown", (e) => {
-      state.isDragging = true;
-      state.dragStartX = e.clientX;
-      state.dragStartAngle = state.currentAngle;
-      markInteraction();
-      nav.setPointerCapture(e.pointerId);
-    });
-
-    nav.addEventListener("pointermove", (e) => {
-      if (!state.isDragging) return;
-      const deltaX = e.clientX - state.dragStartX;
-      const newAngle = state.dragStartAngle + deltaX * 0.4;
-      setDialAngle(newAngle);
-    });
-
-    nav.addEventListener("pointerup", () => {
-      state.isDragging = false;
-      markInteraction();
-      rotateToIndex(state.activeIndex);
-    });
-
-    // Molette
-    nav.addEventListener(
-      "wheel",
-      (e) => {
-        e.preventDefault();
-        markInteraction();
-        const direction = e.deltaY > 0 ? 1 : -1;
-        rotateToIndex((state.activeIndex + direction + SECTIONS.length) % SECTIONS.length);
-      },
-      { passive: false }
-    );
-
-    // Clavier
-    nav.addEventListener("keydown", (e) => {
-      if (e.key === "ArrowRight") {
-        e.preventDefault();
-        markInteraction();
-        rotateToIndex((state.activeIndex + 1) % SECTIONS.length);
-      } else if (e.key === "ArrowLeft") {
-        e.preventDefault();
-        markInteraction();
-        rotateToIndex((state.activeIndex - 1 + SECTIONS.length) % SECTIONS.length);
-      } else if (e.key === "Enter") {
-        e.preventDefault();
-        confirmSelection();
-      }
-    });
-
-    // Pause de la rotation idle au survol / focus du cercle
-    nav.addEventListener("mouseenter", () => {
-      state.dialPaused = true;
-    });
-    nav.addEventListener("mouseleave", () => {
-      state.dialPaused = false;
-      markInteraction();
-    });
-    nav.addEventListener("focusin", () => {
-      state.dialPaused = true;
-    });
-    nav.addEventListener("focusout", () => {
-      state.dialPaused = false;
-      markInteraction();
-    });
-
-    // Clic sur une option = confirmation directe si déjà active, sinon la centre
-    document.querySelectorAll(".dial-option").forEach((opt, i) => {
-      opt.addEventListener("click", () => {
-        if (state.activeIndex === i) {
-          confirmSelection();
-        } else {
-          rotateToIndex(i);
-        }
-      });
-      opt.addEventListener("mouseenter", () => updateDialCenterLabel(i));
-      opt.addEventListener("mouseleave", () => updateDialCenterLabel(state.activeIndex));
-      opt.addEventListener("focus", () => updateDialCenterLabel(i));
-      opt.addEventListener("blur", () => updateDialCenterLabel(state.activeIndex));
-    });
-
-    document.getElementById("dial-back-btn").addEventListener("click", collapseDialBack);
-
-    updateDialCenterLabel(0);
-  }
-
-  function confirmSelection() {
-    const sectionId = SECTIONS[state.activeIndex];
-    triggerSectionTransition(sectionId);
-  }
-
-  /* Rotation idle : très lente, en pause pendant le drag/hover/focus */
-  const IDLE_DELAY_MS = 2600;
-  const IDLE_TURN_MS = 38000;
-  function startIdleRotation() {
-    if (state.reducedMotion) return;
-    let prevTs = null;
-    function tick(ts) {
-      state.idleRAF = requestAnimationFrame(tick);
-      if (prevTs == null) prevTs = ts;
-      const dt = ts - prevTs;
-      prevTs = ts;
-      if (state.isDragging || state.dialPaused) return;
-      if (ts - state.lastInteraction < IDLE_DELAY_MS) return;
-      setDialAngle(state.currentAngle + (360 / IDLE_TURN_MS) * dt);
-    }
-    state.idleRAF = requestAnimationFrame(tick);
-  }
-
-  /* Parallaxe discrète du cercle selon la position de la souris */
-  function initDialParallax() {
-    if (state.reducedMotion || !window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
-    const nav = document.getElementById("dial-nav");
-    const track = document.getElementById("dial-track");
-    nav.addEventListener("mousemove", (e) => {
-      const rect = nav.getBoundingClientRect();
-      const dx = ((e.clientX - (rect.left + rect.width / 2)) / (rect.width / 2)) * 6;
-      const dy = ((e.clientY - (rect.top + rect.height / 2)) / (rect.height / 2)) * 6;
-      track.style.setProperty("--parallax-x", `${dx}px`);
-      track.style.setProperty("--parallax-y", `${dy}px`);
-    });
-    nav.addEventListener("mouseleave", () => {
-      track.style.setProperty("--parallax-x", "0px");
-      track.style.setProperty("--parallax-y", "0px");
-    });
-  }
-
-  /* ============ BANDEAU-CYLINDRE ROTATIF (showcase projets, hero) ============ */
+  /* ============ BANDEAU-CYLINDRE ROTATIF (nav d'accueil ou showcase projets) ============ */
   const REEL_TINTS = ["#1B4FDB", "#FF6B35", "#E91E8C", "#12379E", "#0E7C86"];
   const REEL_AUTO_MS = 3400;
   const reelState = {
+    mode: "projects", // "nav" (accueil, redirige vers une page) ou "projects" (showcase projets)
     items: [],
     position: 0,
     stepPx: 0,
@@ -410,17 +200,40 @@
     setReelTransform(false);
   }
 
+  function currentReelIndex() {
+    const n = reelState.items.length;
+    if (!n) return 0;
+    return ((Math.round(reelState.position) % n) + n) % n;
+  }
+
   function updateReelLabelFromPosition() {
     const items = reelState.items;
     if (!items.length) return;
-    const idx = ((Math.round(reelState.position) % items.length) + items.length) % items.length;
-    const project = items[idx];
+    const idx = currentReelIndex();
+    const item = items[idx];
     const label = document.getElementById("reel-label");
     const thumb = document.getElementById("reel-thumb-img");
-    if (label) label.textContent = projectTitle(project);
-    if (thumb) {
-      thumb.src = projectCover(project);
-      thumb.alt = projectTitle(project);
+    const thumbWrap = thumb && thumb.closest(".reel-pill-thumb");
+
+    if (reelState.mode === "nav") {
+      const total = String(items.length).padStart(2, "0");
+      const current = String(idx + 1).padStart(2, "0");
+      if (label) label.textContent = `${I18N[state.lang][item.labelKey]} — ${current}/${total}`;
+      if (thumb) thumb.src = "";
+      if (thumbWrap) {
+        thumbWrap.classList.add("is-tint");
+        thumbWrap.style.background = item.tint;
+      }
+    } else {
+      if (label) label.textContent = projectTitle(item);
+      if (thumb) {
+        thumb.src = projectCover(item);
+        thumb.alt = projectTitle(item);
+      }
+      if (thumbWrap) {
+        thumbWrap.classList.remove("is-tint");
+        thumbWrap.style.background = "";
+      }
     }
   }
 
@@ -444,6 +257,15 @@
     window.setTimeout(wrapReelIfNeeded, 620);
   }
 
+  function activateReelSlide(index) {
+    if (reelState.mode === "nav") {
+      const section = NAV_SECTIONS[index];
+      if (section) navigateToPage(section.href);
+    } else {
+      openReelProject(index);
+    }
+  }
+
   function openReelProject(index) {
     if (state.activeFilter !== "all") {
       state.activeFilter = "all";
@@ -452,17 +274,44 @@
       });
       renderOrbit();
     }
-    triggerSectionTransition("projets");
-    window.setTimeout(() => {
-      const node = document.querySelector(`.orbit-node[data-index="${index}"]`);
-      if (node) openProjectModal(index, node);
-    }, 520);
+    const node = document.querySelector(`.orbit-node[data-index="${index}"]`);
+    if (node) openProjectModal(index, node);
   }
 
   function buildReelSlides() {
     const track = document.getElementById("reel-track");
     if (!track) return;
+    const wrapper = document.getElementById("reel-wrapper");
+    reelState.mode = wrapper && wrapper.getAttribute("data-reel-mode") === "nav" ? "nav" : "projects";
 
+    if (reelState.mode === "nav") {
+      buildNavReelSlides(track);
+    } else {
+      buildProjectReelSlides(track);
+    }
+  }
+
+  function buildNavReelSlides(track) {
+    reelState.items = NAV_SECTIONS;
+    const n = NAV_SECTIONS.length;
+    const doubled = [...NAV_SECTIONS, ...NAV_SECTIONS];
+    track.innerHTML = doubled
+      .map((section, i) => {
+        const idx = i % n;
+        return `
+        <div class="reel-slide reel-slide--nav" data-index="${idx}" style="--slide-tint:${section.tint}">
+          <p class="reel-slide-index">${String(idx + 1).padStart(2, "0")}/${String(n).padStart(2, "0")}</p>
+          <p class="reel-slide-title reel-slide-title--nav" data-i18n="${section.labelKey}">${I18N[state.lang][section.labelKey]}</p>
+        </div>`;
+      })
+      .join("");
+
+    reelState.position = 0;
+    measureReelStep();
+    updateReelLabelFromPosition();
+  }
+
+  function buildProjectReelSlides(track) {
     const items = getAllProjects().filter((p) => projectCover(p));
     reelState.items = items;
 
@@ -521,7 +370,7 @@
       window.setTimeout(wrapReelIfNeeded, 620);
 
       if (Math.abs(reelState.dragMoved) <= 6 && reelState.pressedSlide) {
-        openReelProject(parseInt(reelState.pressedSlide.getAttribute("data-index"), 10));
+        activateReelSlide(parseInt(reelState.pressedSlide.getAttribute("data-index"), 10));
       }
       reelState.pressedSlide = null;
     }
@@ -533,6 +382,29 @@
     });
     reel.addEventListener("mouseleave", () => {
       reelState.hovered = false;
+    });
+    reel.addEventListener("focus", () => {
+      reelState.hovered = true;
+    });
+    reel.addEventListener("blur", () => {
+      reelState.hovered = false;
+    });
+  }
+
+  function initReelKeyboard() {
+    const reel = document.getElementById("reel");
+    if (!reel) return;
+    reel.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        reelGoTo(1);
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        reelGoTo(-1);
+      } else if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        activateReelSlide(currentReelIndex());
+      }
     });
   }
 
@@ -556,7 +428,7 @@
   }
 
   function startReelAuto() {
-    if (state.reducedMotion) return;
+    if (state.reducedMotion || !document.getElementById("reel")) return;
     let acc = 0;
     let prevTs = null;
     function tick(ts) {
@@ -577,50 +449,14 @@
     reelState.autoRAF = requestAnimationFrame(tick);
   }
 
-  /* ============ TRANSITION PLEIN ÉCRAN ============ */
-  function triggerSectionTransition(sectionId) {
+  /* ============ TRANSITION PLEIN ÉCRAN VERS UNE AUTRE PAGE ============ */
+  function navigateToPage(href) {
     const overlay = document.createElement("div");
     overlay.className = "section-overlay is-active section-overlay--hero";
     document.body.appendChild(overlay);
-
-    setTimeout(() => {
-      const target = document.getElementById(sectionId);
-      if (target) target.scrollIntoView({ behavior: "auto", block: "start" });
-      collapseDial();
-    }, 200);
-
-    overlay.addEventListener("animationend", () => overlay.remove());
-  }
-
-  function collapseDial() {
-    document.getElementById("dial-wrapper").classList.add("is-collapsed");
-    document.getElementById("dial-back-btn").hidden = false;
-  }
-
-  function collapseDialBack() {
-    document.getElementById("dial-wrapper").classList.remove("is-collapsed");
-    document.getElementById("dial-back-btn").hidden = true;
-    document.getElementById("hero").scrollIntoView({ behavior: "smooth" });
-  }
-
-  // Repli auto au scroll manuel (hors clic cercle)
-  function initScrollCollapse() {
-    const hero = document.getElementById("hero");
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        const wrapper = document.getElementById("dial-wrapper");
-        const backBtn = document.getElementById("dial-back-btn");
-        if (entry.isIntersecting) {
-          wrapper.classList.remove("is-collapsed");
-          backBtn.hidden = true;
-        } else {
-          wrapper.classList.add("is-collapsed");
-          backBtn.hidden = false;
-        }
-      },
-      { threshold: 0.3 }
-    );
-    observer.observe(hero);
+    window.setTimeout(() => {
+      window.location.href = href;
+    }, 260);
   }
 
   /* ============ CHARGEMENT DES DONNÉES ============ */
@@ -645,6 +481,9 @@
 
   /* ============ À PROPOS ============ */
   function renderApropos() {
+    const descEl = document.getElementById("apropos-description");
+    if (!descEl) return; // page sans section À propos
+
     const moi = (state.data.moi && state.data.moi[0]) || {};
 
     setText("apropos-description", moi["Description"]);
@@ -655,14 +494,14 @@
 
     const mailEl = document.getElementById("apropos-mail");
     const email = moi["Email"] || moi["Mail"];
-    if (email) {
+    if (email && mailEl) {
       mailEl.textContent = email;
       mailEl.href = `mailto:${email}`;
     }
 
-    if (moi["Photo"] && moi["Photo"][0]) {
-      document.getElementById("hero-photo-img").src = moi["Photo"][0].url;
-      document.getElementById("dial-center-img").src = moi["Photo"][0].url;
+    const photoEl = document.getElementById("hero-photo-img");
+    if (photoEl && moi["Photo"] && moi["Photo"][0]) {
+      photoEl.src = moi["Photo"][0].url;
     }
 
     // Timeline : expériences "terrain" (pro/stage/job/césure) triées de la plus récente à la plus ancienne
@@ -763,10 +602,11 @@
   }
 
   function renderProjets() {
+    const clientsEl = document.getElementById("projets-clients");
+    if (!clientsEl) return; // page sans section Projets
+
     const clients = ["AS Monaco", "CNOSF", "Paris 2024", "Centre Français"];
-    document.getElementById("projets-clients").innerHTML = clients
-      .map((c) => `<li>${c}</li>`)
-      .join("");
+    clientsEl.innerHTML = clients.map((c) => `<li>${c}</li>`).join("");
 
     renderOrbit();
     buildReelSlides();
@@ -1003,6 +843,9 @@
   }
 
   function initModal() {
+    const modalEl = document.getElementById("projet-modal");
+    if (!modalEl) return; // page sans modal projet
+
     const els = getModalEls();
 
     document.querySelectorAll("[data-modal-close]").forEach((el) => {
@@ -1044,6 +887,9 @@
 
   /* ============ SOFTWARES ============ */
   function renderSoftwares() {
+    const grid = document.getElementById("softwares-grid");
+    if (!grid) return; // page sans section Softwares
+
     const softwares = [...(state.data.softwares || [])].sort((a, b) => (a["Rang"] || 0) - (b["Rang"] || 0));
     const grouped = {};
     softwares.forEach((sw) => {
@@ -1052,7 +898,6 @@
       grouped[type].push(sw);
     });
 
-    const grid = document.getElementById("softwares-grid");
     grid.innerHTML = Object.entries(grouped)
       .map(
         ([type, items]) => `
@@ -1072,13 +917,16 @@
 
   /* ============ DIPLÔMES ============ */
   function renderDiplomes() {
+    const timelineEl = document.getElementById("diplomes-timeline");
+    if (!timelineEl) return; // page sans section Diplômes
+
     const diplomes = [...(state.data.diplomes || [])].sort((a, b) => {
       const dateA = new Date(a["Date"] || a["Date pas texte"] || 0);
       const dateB = new Date(b["Date"] || b["Date pas texte"] || 0);
       return dateA - dateB;
     });
 
-    document.getElementById("diplomes-timeline").innerHTML = diplomes
+    timelineEl.innerHTML = diplomes
       .map(
         (d) => `
         <li class="timeline-item">
@@ -1092,8 +940,11 @@
 
   /* ============ BÉNÉVOLAT ============ */
   function renderBenevolat() {
+    const grid = document.getElementById("benevolat-grid");
+    if (!grid) return; // page sans section Bénévolat
+
     const benevolat = state.data.benevolat || [];
-    document.getElementById("benevolat-grid").innerHTML = benevolat
+    grid.innerHTML = benevolat
       .map(
         (b) => `
         <div class="benevolat-card">
@@ -1108,8 +959,10 @@
 
   /* ============ CONTACT ============ */
   function renderContact() {
-    const moi = (state.data && state.data.moi && state.data.moi[0]) || {};
     const contactMail = document.getElementById("contact-mail");
+    if (!contactMail) return; // page sans section Contact
+
+    const moi = (state.data && state.data.moi && state.data.moi[0]) || {};
     const email = moi["Email"] || moi["Mail"];
     if (email) {
       contactMail.href = `mailto:${email}`;
@@ -1147,7 +1000,6 @@
     window.addEventListener("resize", () => {
       cancelAnimationFrame(state.resizeRAF);
       state.resizeRAF = requestAnimationFrame(() => {
-        setDialAngle(state.currentAngle);
         applyOrbitLayout();
         measureReelStep();
       });
@@ -1157,20 +1009,21 @@
   /* ============ INIT ============ */
   document.addEventListener("DOMContentLoaded", () => {
     state.reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    state.lastInteraction = performance.now();
 
     applyI18n();
     initLangSwitcher();
     initCustomCursor();
-    initDial();
-    initDialParallax();
-    startIdleRotation();
     initReelControls();
+    initReelKeyboard();
     startReelAuto();
-    initScrollCollapse();
     initModal();
     initScrollReveals();
     initResizeHandling();
-    loadData().then(renderContact);
+
+    if (document.body.dataset.page === "home") {
+      buildReelSlides();
+    } else {
+      loadData().then(renderContact);
+    }
   });
 })();

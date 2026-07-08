@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="fr" data-lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mes projets — Adrien Benichou</title>
+<meta name="description" content="Portfolio d'Adrien Benichou, étudiant M2 International Sport &amp; Event Management, spécialisé CRM et Community Management.">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="style.css">
+</head>
+<body data-page="projets">
+
+  <div id="custom-cursor" aria-hidden="true"></div>
+
+  <div class="lang-switcher" role="group" aria-label="Changer de langue">
+    <button type="button" class="lang-btn is-active" data-lang-btn="fr" aria-pressed="true">FR</button>
+    <button type="button" class="lang-btn" data-lang-btn="en" aria-pressed="false">EN</button>
+  </div>
+
+  <nav class="page-nav" aria-label="Navigation site">
+    <a href="index.html" class="page-nav-link" data-i18n="nav.home">&larr; Accueil</a>
+    <a href="contact.html" class="page-nav-link" data-i18n="contact.title">Contact</a>
+  </nav>
+
+  <main id="main-content">
+
+    <!-- ============ MES PROJETS ============ -->
+    <section id="projets" class="section section-projets" data-reveal>
+      <div class="section-inner">
+        <p class="eyebrow" data-i18n="projets.eyebrow">Ils m'ont fait confiance</p>
+        <h2 data-i18n="projets.title">Mes projets</h2>
+
+        <!-- ===== Bandeau-cylindre rotatif (showcase projets, inspiré de la vidéo de référence) ===== -->
+        <div class="projets-reel">
+          <div class="reel-wrapper" id="reel-wrapper">
+            <div class="reel" id="reel" tabindex="0" role="listbox" aria-label="Sélection de projet">
+              <div class="reel-track" id="reel-track">
+                <!-- slides injectés par main.js depuis les projets -->
+              </div>
+            </div>
+            <div class="reel-controls">
+              <div class="reel-pill">
+                <div class="reel-pill-thumb"><img id="reel-thumb-img" src="" alt=""></div>
+                <p class="reel-pill-label" id="reel-label"></p>
+                <div class="reel-pill-arrows">
+                  <button type="button" class="reel-arrow" id="reel-prev" aria-label="Projet précédent">&larr;</button>
+                  <button type="button" class="reel-arrow" id="reel-next" aria-label="Projet suivant">&rarr;</button>
+                </div>
+              </div>
+              <button type="button" class="reel-toggle" id="reel-toggle" aria-label="Mettre en pause la rotation" aria-pressed="false">
+                <span class="reel-toggle-icon" aria-hidden="true"></span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Logos clients, visibles sans scroller -->
+        <ul id="projets-clients" class="clients-strip" aria-label="Entreprises et organisations">
+          <!-- injecté par main.js : AS Monaco, CNOSF, Paris 2024, Centre Français -->
+        </ul>
+
+        <!-- Filtre par type -->
+        <div class="projets-filters" role="group" aria-label="Filtrer les projets par type">
+          <button type="button" class="filter-btn is-active" data-filter="all" data-i18n="projets.filterAll">Tous</button>
+          <button type="button" class="filter-btn" data-filter="pro" data-i18n="projets.filterPro">Projets Pro</button>
+          <button type="button" class="filter-btn" data-filter="stage" data-i18n="projets.filterStage">Stage</button>
+          <button type="button" class="filter-btn" data-filter="job" data-i18n="projets.filterJob">Job étudiant</button>
+          <button type="button" class="filter-btn" data-filter="etudiant" data-i18n="projets.filterEtudiant">Projets étudiants</button>
+          <button type="button" class="filter-btn" data-filter="cesure" data-i18n="projets.filterCesure">Césure</button>
+        </div>
+
+        <div class="orbit-wrapper">
+          <div
+            id="projets-orbit"
+            class="orbit-nav"
+            role="listbox"
+            aria-label="Sélection de projet"
+            tabindex="0"
+          >
+            <div class="orbit-track" id="projets-orbit-track" data-reveal-stagger>
+              <!-- nœuds projets injectés par main.js -->
+            </div>
+            <div class="orbit-center" id="orbit-center" aria-hidden="true">
+              <img id="orbit-center-img" src="" alt="">
+              <div class="orbit-center-overlay"></div>
+              <div class="orbit-center-text">
+                <p id="orbit-center-cat" class="orbit-center-cat"></p>
+                <p id="orbit-center-title" class="orbit-center-title"></p>
+                <p id="orbit-center-meta" class="orbit-center-meta"></p>
+              </div>
+            </div>
+          </div>
+          <p class="orbit-hint" data-i18n="projets.orbitHint">Clique un projet pour l'ouvrir en plein écran</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Modal projet immersif (template rempli dynamiquement) -->
+    <div id="projet-modal" class="projet-modal" role="dialog" aria-modal="true" aria-labelledby="projet-modal-title" hidden>
+      <div class="projet-modal-backdrop" data-modal-close></div>
+      <div class="projet-modal-content" id="projet-modal-content">
+        <div class="projet-modal-topbar">
+          <p class="projet-modal-index">
+            <span id="projet-modal-index-current">1</span>&nbsp;/&nbsp;<span id="projet-modal-index-total">1</span>
+          </p>
+          <div class="projet-modal-nav">
+            <button type="button" class="projet-modal-arrow" id="projet-modal-prev" aria-label="Projet précédent">&larr;</button>
+            <button type="button" class="projet-modal-arrow" id="projet-modal-next" aria-label="Projet suivant">&rarr;</button>
+          </div>
+          <button type="button" class="projet-modal-close" data-modal-close aria-label="Fermer">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="projet-modal-scroll" id="projet-modal-scroll">
+          <div class="projet-modal-cover">
+            <img id="projet-modal-img" src="" alt="">
+          </div>
+          <div class="projet-modal-body">
+            <p id="projet-modal-entreprise" class="projet-modal-entreprise"></p>
+            <h3 id="projet-modal-title" class="projet-modal-title"></h3>
+            <p id="projet-modal-dates" class="projet-modal-dates"></p>
+            <p id="projet-modal-description" class="projet-modal-description"></p>
+            <ul id="projet-modal-skills" class="projet-modal-skills" aria-label="Compétences mobilisées"></ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- AOS : lib d'animation légère pour les scroll-reveals -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.js"></script>
+
+  <script src="main.js" defer></script>
+</body>
+</html>
