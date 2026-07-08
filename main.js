@@ -289,6 +289,11 @@
     } else {
       buildProjectReelSlides(track);
     }
+
+    // Mise en scène d'entrée : le cylindre apparaît (fade + léger scale) une fois ses slides prêtes.
+    if (wrapper && !wrapper.classList.contains("is-ready")) {
+      requestAnimationFrame(() => requestAnimationFrame(() => wrapper.classList.add("is-ready")));
+    }
   }
 
   function buildNavReelSlides(track) {
