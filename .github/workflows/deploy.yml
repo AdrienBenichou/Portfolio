@@ -30,6 +30,15 @@ jobs:
           AIRTABLE_API_KEY: ${{ secrets.AIRTABLE_API_KEY }}
           AIRTABLE_BASE_ID: ${{ secrets.AIRTABLE_BASE_ID }}
 
+      # GitHub Pages caches main.js/style.css for 10 min (max-age=600) under their
+      # unversioned filenames, so browsers can serve a stale mix right after a deploy.
+      # Bust the cache on every deploy by tagging references with the commit SHA.
+      - name: Cache-bust CSS/JS references
+        run: |
+          for f in *.html; do
+            sed -i "s/href=\"style\.css\"/href=\"style.css?v=${GITHUB_SHA}\"/g; s/src=\"main\.js\"/src=\"main.js?v=${GITHUB_SHA}\"/g" "$f"
+          done
+
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3
