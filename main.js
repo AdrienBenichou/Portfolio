@@ -626,7 +626,7 @@
   /* ============ CHARGEMENT DES DONNÉES ============ */
   async function loadData() {
     try {
-      const res = await fetch("/data.json");
+      const res = await fetch("data.json");
       if (!res.ok) throw new Error(`data.json introuvable (${res.status})`);
       state.data = await res.json();
       renderAll();
