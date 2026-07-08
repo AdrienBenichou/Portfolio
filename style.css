@@ -176,7 +176,7 @@ img { max-width: 100%; display: block; }
   /* Le hub doit toujours tenir dans un seul écran : on réserve l'espace pris par
      le texte/padding autour du cercle (~380px) avant de dimensionner le cercle
      sur la hauteur de viewport restante, pas seulement sur la largeur. */
-  --dial-outer: max(220px, min(1000px, calc(100vh - 408px), 66vw));
+  --dial-outer: max(220px, min(1000px, calc(100vh - 620px), 66vw));
   --dial-size: calc(var(--dial-outer) * 0.76);
   --dial-label-gap: calc(var(--dial-outer) * 0.062);
   --dial-ring-thickness: clamp(1.25px, calc(var(--dial-outer) / 380), 2px);
@@ -250,6 +250,208 @@ img { max-width: 100%; display: block; }
 
 @media (max-width: 640px) {
   .hero-photo { top: 24px; right: 24px; width: 44px; height: 44px; }
+}
+
+/* Mot-clé géant en fond de hero (écho du wordmark "PORTFOLIO" de l'inspiration vidéo) */
+.hero-bg-word {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(4.5rem, 17vw, 13rem);
+  letter-spacing: -0.03em;
+  color: rgba(255, 255, 255, 0.045);
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ============================================
+   BANDEAU-CYLINDRE ROTATIF (showcase projets)
+   ============================================ */
+.reel-wrapper {
+  position: relative;
+  z-index: 2;
+  width: min(1040px, 92vw);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  margin: 4px 0 22px;
+}
+
+.reel {
+  position: relative;
+  width: 100%;
+  height: clamp(140px, 22vw, 260px);
+  border-radius: 50% / 16%;
+  overflow: hidden;
+  background: #17181c;
+  cursor: grab;
+  touch-action: pan-y;
+}
+.reel:active { cursor: grabbing; }
+
+.reel-track {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  display: flex;
+  gap: clamp(10px, 2vw, 20px);
+  will-change: transform;
+  transition: transform 0.6s var(--ease-out);
+}
+.reel-track.is-dragging { transition: none; }
+
+.reel-slide {
+  position: relative;
+  flex: 0 0 clamp(200px, 34vw, 420px);
+  height: 100%;
+  cursor: pointer;
+}
+.reel-slide img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.reel-slide::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--slide-tint, transparent);
+  mix-blend-mode: color;
+  opacity: 0.65;
+  z-index: 1;
+}
+.reel-slide::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(16, 17, 20, 0) 50%, rgba(16, 17, 20, 0.6) 100%);
+  z-index: 1;
+}
+.reel-slide-title {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 10px;
+  z-index: 2;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #fff;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.25s var(--ease-out), transform 0.25s var(--ease-out);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.reel-slide:hover .reel-slide-title,
+.reel-slide:focus-visible .reel-slide-title {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.reel-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.reel-pill {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 10px 6px 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-radius: 999px;
+}
+.reel-pill-thumb {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.08);
+}
+.reel-pill-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.reel-pill-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--hero-text);
+  min-width: 84px;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.reel-pill-arrows { display: flex; gap: 6px; }
+.reel-arrow {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--hero-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  transition: background 0.2s var(--ease-out), transform 0.2s var(--ease-out);
+}
+.reel-arrow:hover, .reel-arrow:focus-visible { background: rgba(255, 255, 255, 0.24); transform: scale(1.06); }
+
+.reel-toggle {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s var(--ease-out);
+}
+.reel-toggle:hover, .reel-toggle:focus-visible { background: rgba(255, 255, 255, 0.18); }
+.reel-toggle-icon {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1.5px solid var(--hero-text);
+  border-top-color: transparent;
+  animation: reel-spin 1.4s linear infinite;
+}
+.reel-toggle[aria-pressed="true"] .reel-toggle-icon {
+  animation: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 1px;
+  border: none;
+  background: var(--hero-text);
+}
+
+@keyframes reel-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 640px) {
+  .reel-slide { flex-basis: 68vw; }
+  .reel-pill-label { min-width: 60px; max-width: 120px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reel-toggle-icon { animation: none; }
+  .reel-track { transition: none; }
 }
 
 /* ============================================

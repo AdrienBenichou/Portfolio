@@ -144,13 +144,14 @@
 
       const dialOpt = e.target.closest(".dial-option");
       const orbitNode = e.target.closest(".orbit-node");
-      const interactive = e.target.closest("a, button, .software-item, .orbit-node, .dial-option");
+      const reelSlide = e.target.closest(".reel-slide");
+      const interactive = e.target.closest("a, button, .software-item, .orbit-node, .dial-option, .reel-slide");
 
       if (interactive) cursor.classList.add("is-hover");
       if (dialOpt) {
         cursor.classList.add("is-label");
         cursor.setAttribute("data-cursor-label", "OUVRIR");
-      } else if (orbitNode) {
+      } else if (orbitNode || reelSlide) {
         cursor.classList.add("is-label");
         cursor.setAttribute("data-cursor-label", "VOIR");
       }
@@ -160,7 +161,7 @@
       if (hero.contains(e.target) && !hero.contains(e.relatedTarget)) {
         cursor.classList.remove("is-dark");
       }
-      const interactive = e.target.closest("a, button, .software-item, .orbit-node, .dial-option");
+      const interactive = e.target.closest("a, button, .software-item, .orbit-node, .dial-option, .reel-slide");
       if (interactive && !interactive.contains(e.relatedTarget)) {
         cursor.classList.remove("is-hover");
         cursor.classList.remove("is-label");
@@ -173,7 +174,7 @@
   // Miroir exact de la formule CSS de .hero (--dial-outer / --dial-size / --dial-label-gap)
   // pour que le rayon utilisé par le JS corresponde toujours au rendu réel.
   function getDialRadius() {
-    const outer = Math.max(220, Math.min(1000, window.innerHeight - 408, window.innerWidth * 0.66));
+    const outer = Math.max(220, Math.min(1000, window.innerHeight - 620, window.innerWidth * 0.66));
     const ringSize = outer * 0.76;
     const gap = outer * 0.062;
     return ringSize / 2 + gap;
@@ -373,6 +374,209 @@
     });
   }
 
+  /* ============ BANDEAU-CYLINDRE ROTATIF (showcase projets, hero) ============ */
+  const REEL_TINTS = ["#1B4FDB", "#FF6B35", "#E91E8C", "#12379E", "#0E7C86"];
+  const REEL_AUTO_MS = 3400;
+  const reelState = {
+    items: [],
+    position: 0,
+    stepPx: 0,
+    dragging: false,
+    dragStartX: 0,
+    dragStartPos: 0,
+    dragMoved: 0,
+    pressedSlide: null,
+    hovered: false,
+    manualPause: false,
+    autoRAF: null,
+  };
+
+  function setReelTransform(animate) {
+    const track = document.getElementById("reel-track");
+    if (!track) return;
+    track.classList.toggle("is-dragging", !animate);
+    track.style.transform = `translateX(${-reelState.position * reelState.stepPx}px)`;
+  }
+
+  function measureReelStep() {
+    const track = document.getElementById("reel-track");
+    const first = track && track.querySelector(".reel-slide");
+    if (!first) {
+      reelState.stepPx = 0;
+      return;
+    }
+    const gap = parseFloat(getComputedStyle(track).columnGap || getComputedStyle(track).gap || "0") || 0;
+    reelState.stepPx = first.getBoundingClientRect().width + gap;
+    setReelTransform(false);
+  }
+
+  function updateReelLabelFromPosition() {
+    const items = reelState.items;
+    if (!items.length) return;
+    const idx = ((Math.round(reelState.position) % items.length) + items.length) % items.length;
+    const project = items[idx];
+    const label = document.getElementById("reel-label");
+    const thumb = document.getElementById("reel-thumb-img");
+    if (label) label.textContent = projectTitle(project);
+    if (thumb) {
+      thumb.src = projectCover(project);
+      thumb.alt = projectTitle(project);
+    }
+  }
+
+  function wrapReelIfNeeded() {
+    const n = reelState.items.length;
+    if (!n) return;
+    if (reelState.position >= n) {
+      reelState.position -= n;
+      setReelTransform(false);
+    } else if (reelState.position < 0) {
+      reelState.position += n;
+      setReelTransform(false);
+    }
+  }
+
+  function reelGoTo(delta) {
+    if (!reelState.items.length) return;
+    reelState.position += delta;
+    setReelTransform(true);
+    updateReelLabelFromPosition();
+    window.setTimeout(wrapReelIfNeeded, 620);
+  }
+
+  function openReelProject(index) {
+    if (state.activeFilter !== "all") {
+      state.activeFilter = "all";
+      document.querySelectorAll(".filter-btn").forEach((b) => {
+        b.classList.toggle("is-active", b.getAttribute("data-filter") === "all");
+      });
+      renderOrbit();
+    }
+    triggerSectionTransition("projets");
+    window.setTimeout(() => {
+      const node = document.querySelector(`.orbit-node[data-index="${index}"]`);
+      if (node) openProjectModal(index, node);
+    }, 520);
+  }
+
+  function buildReelSlides() {
+    const track = document.getElementById("reel-track");
+    if (!track) return;
+
+    const items = getAllProjects().filter((p) => projectCover(p));
+    reelState.items = items;
+
+    if (!items.length) {
+      track.innerHTML = "";
+      return;
+    }
+
+    const doubled = [...items, ...items];
+    track.innerHTML = doubled
+      .map(
+        (p, i) => `
+        <div class="reel-slide" data-index="${i % items.length}" style="--slide-tint:${REEL_TINTS[i % REEL_TINTS.length]}">
+          <img src="${projectCover(p)}" alt="${projectTitle(p)}" loading="lazy">
+          <p class="reel-slide-title">${projectTitle(p)}</p>
+        </div>`
+      )
+      .join("");
+
+    reelState.position = 0;
+    measureReelStep();
+    updateReelLabelFromPosition();
+  }
+
+  function initReelDrag() {
+    const reel = document.getElementById("reel");
+    if (!reel) return;
+
+    reel.addEventListener("pointerdown", (e) => {
+      if (!reelState.items.length) return;
+      reelState.dragging = true;
+      reelState.dragMoved = 0;
+      reelState.dragStartX = e.clientX;
+      reelState.dragStartPos = reelState.position;
+      reelState.pressedSlide = e.target.closest(".reel-slide");
+      reel.setPointerCapture(e.pointerId);
+    });
+
+    reel.addEventListener("pointermove", (e) => {
+      if (!reelState.dragging || !reelState.stepPx) return;
+      const deltaX = e.clientX - reelState.dragStartX;
+      reelState.dragMoved = deltaX;
+      reelState.position = reelState.dragStartPos - deltaX / reelState.stepPx;
+      setReelTransform(false);
+    });
+
+    // setPointerCapture() retargète le pointerup (et le click qui en découle) vers #reel :
+    // on ne peut donc pas compter sur un simple listener "click" posé sur chaque .reel-slide.
+    // On détecte ici l'intention (clic vs drag) via la distance parcourue depuis le pointerdown.
+    function endDrag() {
+      if (!reelState.dragging) return;
+      reelState.dragging = false;
+      reelState.position = Math.round(reelState.position);
+      setReelTransform(true);
+      updateReelLabelFromPosition();
+      window.setTimeout(wrapReelIfNeeded, 620);
+
+      if (Math.abs(reelState.dragMoved) <= 6 && reelState.pressedSlide) {
+        openReelProject(parseInt(reelState.pressedSlide.getAttribute("data-index"), 10));
+      }
+      reelState.pressedSlide = null;
+    }
+    reel.addEventListener("pointerup", endDrag);
+    reel.addEventListener("pointercancel", endDrag);
+
+    reel.addEventListener("mouseenter", () => {
+      reelState.hovered = true;
+    });
+    reel.addEventListener("mouseleave", () => {
+      reelState.hovered = false;
+    });
+  }
+
+  function initReelControls() {
+    const prevBtn = document.getElementById("reel-prev");
+    const nextBtn = document.getElementById("reel-next");
+    const toggleBtn = document.getElementById("reel-toggle");
+    if (prevBtn) prevBtn.addEventListener("click", () => reelGoTo(-1));
+    if (nextBtn) nextBtn.addEventListener("click", () => reelGoTo(1));
+    if (toggleBtn) {
+      toggleBtn.addEventListener("click", () => {
+        reelState.manualPause = !reelState.manualPause;
+        toggleBtn.setAttribute("aria-pressed", String(reelState.manualPause));
+        toggleBtn.setAttribute(
+          "aria-label",
+          reelState.manualPause ? "Reprendre la rotation" : "Mettre en pause la rotation"
+        );
+      });
+    }
+    initReelDrag();
+  }
+
+  function startReelAuto() {
+    if (state.reducedMotion) return;
+    let acc = 0;
+    let prevTs = null;
+    function tick(ts) {
+      reelState.autoRAF = requestAnimationFrame(tick);
+      if (prevTs == null) prevTs = ts;
+      const dt = ts - prevTs;
+      prevTs = ts;
+      if (reelState.dragging || reelState.hovered || reelState.manualPause || !reelState.items.length) {
+        acc = 0;
+        return;
+      }
+      acc += dt;
+      if (acc >= REEL_AUTO_MS) {
+        acc = 0;
+        reelGoTo(1);
+      }
+    }
+    reelState.autoRAF = requestAnimationFrame(tick);
+  }
+
   /* ============ TRANSITION PLEIN ÉCRAN ============ */
   function triggerSectionTransition(sectionId) {
     const overlay = document.createElement("div");
@@ -565,6 +769,7 @@
       .join("");
 
     renderOrbit();
+    buildReelSlides();
 
     document.querySelectorAll(".filter-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -944,6 +1149,7 @@
       state.resizeRAF = requestAnimationFrame(() => {
         setDialAngle(state.currentAngle);
         applyOrbitLayout();
+        measureReelStep();
       });
     });
   }
@@ -959,6 +1165,8 @@
     initDial();
     initDialParallax();
     startIdleRotation();
+    initReelControls();
+    startReelAuto();
     initScrollCollapse();
     initModal();
     initScrollReveals();

@@ -26,6 +26,8 @@
 
   <!-- ============ HERO ============ -->
   <header id="hero" class="hero">
+    <p class="hero-bg-word" aria-hidden="true">Portfolio</p>
+
     <div class="hero-intro">
       <p class="eyebrow" data-i18n="hero.eyebrow">Sport × Digital</p>
       <h1 class="hero-name">Adrien Benichou</h1>
@@ -37,6 +39,28 @@
     <!-- Photo : REMPLACER par la vraie photo (ou laisser le fallback Airtable "Photo") -->
     <div class="hero-photo">
       <img id="hero-photo-img" src="" alt="Photo d'Adrien Benichou" data-photo-placeholder="true">
+    </div>
+
+    <!-- ===== Bandeau-cylindre rotatif (showcase projets, inspiré de la vidéo de référence) ===== -->
+    <div class="reel-wrapper" id="reel-wrapper">
+      <div class="reel" id="reel">
+        <div class="reel-track" id="reel-track">
+          <!-- slides injectés par main.js depuis les projets -->
+        </div>
+      </div>
+      <div class="reel-controls">
+        <div class="reel-pill">
+          <div class="reel-pill-thumb"><img id="reel-thumb-img" src="" alt=""></div>
+          <p class="reel-pill-label" id="reel-label"></p>
+          <div class="reel-pill-arrows">
+            <button type="button" class="reel-arrow" id="reel-prev" aria-label="Projet précédent">&larr;</button>
+            <button type="button" class="reel-arrow" id="reel-next" aria-label="Projet suivant">&rarr;</button>
+          </div>
+        </div>
+        <button type="button" class="reel-toggle" id="reel-toggle" aria-label="Mettre en pause la rotation" aria-pressed="false">
+          <span class="reel-toggle-icon" aria-hidden="true"></span>
+        </button>
+      </div>
     </div>
 
     <!-- ===== Cercle rotatif de navigation (signature visuelle) ===== -->
