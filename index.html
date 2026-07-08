@@ -26,42 +26,6 @@
 
   <!-- ============ HERO ============ -->
   <header id="hero" class="hero">
-    <p class="hero-bg-word" aria-hidden="true">Portfolio</p>
-
-    <div class="hero-intro">
-      <p class="eyebrow" data-i18n="hero.eyebrow">Sport × Digital</p>
-      <h1 class="hero-name">Adrien Benichou</h1>
-      <p class="hero-tagline" data-i18n="hero.tagline">
-        Je fais rimer performance sportive et stratégie digitale.
-      </p>
-    </div>
-
-    <!-- Photo : REMPLACER par la vraie photo (ou laisser le fallback Airtable "Photo") -->
-    <div class="hero-photo">
-      <img id="hero-photo-img" src="" alt="Photo d'Adrien Benichou" data-photo-placeholder="true">
-    </div>
-
-    <!-- ===== Bandeau-cylindre rotatif (showcase projets, inspiré de la vidéo de référence) ===== -->
-    <div class="reel-wrapper" id="reel-wrapper">
-      <div class="reel" id="reel">
-        <div class="reel-track" id="reel-track">
-          <!-- slides injectés par main.js depuis les projets -->
-        </div>
-      </div>
-      <div class="reel-controls">
-        <div class="reel-pill">
-          <div class="reel-pill-thumb"><img id="reel-thumb-img" src="" alt=""></div>
-          <p class="reel-pill-label" id="reel-label"></p>
-          <div class="reel-pill-arrows">
-            <button type="button" class="reel-arrow" id="reel-prev" aria-label="Projet précédent">&larr;</button>
-            <button type="button" class="reel-arrow" id="reel-next" aria-label="Projet suivant">&rarr;</button>
-          </div>
-        </div>
-        <button type="button" class="reel-toggle" id="reel-toggle" aria-label="Mettre en pause la rotation" aria-pressed="false">
-          <span class="reel-toggle-icon" aria-hidden="true"></span>
-        </button>
-      </div>
-    </div>
 
     <!-- ===== Cercle rotatif de navigation (signature visuelle) ===== -->
     <div id="dial-wrapper" class="dial-wrapper">
@@ -147,10 +111,6 @@
     <button type="button" class="dial-back-btn" id="dial-back-btn" data-i18n="nav.back" hidden>
       Retour
     </button>
-
-    <div class="scroll-indicator" aria-hidden="true">
-      <span></span>
-    </div>
   </header>
 
   <main id="main-content">
@@ -158,6 +118,20 @@
     <!-- ============ À PROPOS ============ -->
     <section id="apropos" class="section section-apropos" data-reveal>
       <div class="section-inner">
+        <div class="apropos-header">
+          <!-- Photo : REMPLACER par la vraie photo (ou laisser le fallback Airtable "Photo") -->
+          <div class="apropos-photo">
+            <img id="hero-photo-img" src="" alt="Photo d'Adrien Benichou" data-photo-placeholder="true">
+          </div>
+          <div class="apropos-header-text">
+            <p class="eyebrow" data-i18n="hero.eyebrow">Sport × Digital</p>
+            <h1 class="apropos-name">Adrien Benichou</h1>
+            <p class="apropos-tagline" data-i18n="hero.tagline">
+              Je fais rimer performance sportive et stratégie digitale.
+            </p>
+          </div>
+        </div>
+
         <p class="eyebrow" data-i18n="apropos.eyebrow">Qui je suis</p>
         <h2 data-i18n="apropos.title">À propos de moi</h2>
 
@@ -209,6 +183,30 @@
       <div class="section-inner">
         <p class="eyebrow" data-i18n="projets.eyebrow">Ils m'ont fait confiance</p>
         <h2 data-i18n="projets.title">Mes projets</h2>
+
+        <!-- ===== Bandeau-cylindre rotatif (showcase projets, inspiré de la vidéo de référence) ===== -->
+        <div class="projets-reel">
+          <div class="reel-wrapper" id="reel-wrapper">
+            <div class="reel" id="reel">
+              <div class="reel-track" id="reel-track">
+                <!-- slides injectés par main.js depuis les projets -->
+              </div>
+            </div>
+            <div class="reel-controls">
+              <div class="reel-pill">
+                <div class="reel-pill-thumb"><img id="reel-thumb-img" src="" alt=""></div>
+                <p class="reel-pill-label" id="reel-label"></p>
+                <div class="reel-pill-arrows">
+                  <button type="button" class="reel-arrow" id="reel-prev" aria-label="Projet précédent">&larr;</button>
+                  <button type="button" class="reel-arrow" id="reel-next" aria-label="Projet suivant">&rarr;</button>
+                </div>
+              </div>
+              <button type="button" class="reel-toggle" id="reel-toggle" aria-label="Mettre en pause la rotation" aria-pressed="false">
+                <span class="reel-toggle-icon" aria-hidden="true"></span>
+              </button>
+            </div>
+          </div>
+        </div>
 
         <!-- Logos clients, visibles sans scroller -->
         <ul id="projets-clients" class="clients-strip" aria-label="Entreprises et organisations">
