@@ -463,7 +463,7 @@ img { max-width: 100%; display: block; }
 .hero-bg-name {
   position: relative;
   z-index: 0;
-  margin: 0 0 clamp(-56px, -7vw, -34px);
+  margin: 0 0 clamp(-16px, -1.5vw, -6px);
   font-family: var(--font-display);
   font-weight: 700;
   line-height: 1;
@@ -475,7 +475,7 @@ img { max-width: 100%; display: block; }
   user-select: none;
 }
 @media (max-width: 480px) {
-  .hero-bg-name { white-space: normal; text-align: center; max-width: 88vw; margin-bottom: -20px; }
+  .hero-bg-name { white-space: normal; text-align: center; max-width: 88vw; margin-bottom: -4px; }
 }
 
 .hero--nav-only .reel-wrapper {
