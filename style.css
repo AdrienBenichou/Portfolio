@@ -474,10 +474,8 @@ img { max-width: 100%; display: block; }
   pointer-events: auto;
   cursor: default;
   user-select: none;
-}
-.hbn-char {
-  display: inline-block;
-  will-change: transform;
+  filter: url(#hero-name-wave);
+  will-change: filter;
 }
 @media (max-width: 480px) {
   .hero-bg-name { white-space: normal; text-align: center; max-width: 88vw; margin-bottom: -4px; }

@@ -1009,74 +1009,67 @@
     });
   }
 
-  /* ============ EFFET DE VAGUE AU SURVOL DU NOM EN FOND DE HERO ============ */
-  // Chaque passage de souris crée une onde localisée qui se propage horizontalement
-  // depuis le curseur et s'amortit dans le temps ; plus on bouge la souris, plus les
-  // ondes s'accumulent, puis tout se dissipe et les lettres reviennent à leur place.
-  const RIPPLE_AMPLITUDE = 9; // px de déplacement vertical max
-  const RIPPLE_SPEED = 0.4; // px/ms de propagation du front d'onde
-  const RIPPLE_SPREAD = 46; // largeur (px) du front d'onde
-  const RIPPLE_WAVELENGTH = 0.14; // fréquence spatiale de l'oscillation
-  const RIPPLE_DECAY_MS = 900; // constante d'amortissement de l'enveloppe
-  const RIPPLE_MAX_AGE_MS = 1400; // durée de vie max avant suppression
-  const RIPPLE_THROTTLE_MS = 45; // délai mini entre deux ondes créées
+  /* ============ EFFET DE VAGUE LIQUIDE AU SURVOL DU NOM EN FOND DE HERO ============ */
+  // Le nom est déformé via un filtre SVG (turbulence + displacement map, voir index.html) :
+  // chaque mouvement de souris ajoute de l'énergie à la vague (proportionnelle à la vitesse
+  // du curseur), qui se dissipe ensuite en continu ; plus on bouge, plus ça vague fort.
+  const WAVE_MAX_SCALE = 34; // amplitude max de la déformation (unités du displacement map)
+  const WAVE_DECAY_MS = 650; // constante de dissipation de l'énergie
+  const WAVE_BUMP_PER_PXMS = 0.9; // énergie ajoutée par unité de vitesse du curseur (px/ms)
+  const WAVE_FLOW_SPEED = 0.05; // vitesse de "l'écoulement" du bruit sous le texte
+  const WAVE_EPSILON = 0.004;
 
-  function initHeroNameRipple() {
+  function initHeroNameWave() {
     const nameEl = document.getElementById("hero-bg-name");
-    if (!nameEl || state.reducedMotion || !window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+    const displacementMap = document.getElementById("hero-name-wave-map");
+    const noiseFlow = document.querySelector("#hero-name-wave feOffset");
+    if (!nameEl || !displacementMap || !noiseFlow) return;
+    if (state.reducedMotion || !window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
 
-    const text = nameEl.textContent;
-    nameEl.textContent = "";
-    const chars = [...text].map((ch) => {
-      const span = document.createElement("span");
-      span.className = "hbn-char";
-      span.textContent = ch === " " ? " " : ch;
-      nameEl.appendChild(span);
-      return { span, x: 0 };
-    });
+    let energy = 0;
+    let phase = 0;
+    let lastMoveX = null;
+    let lastMoveY = null;
+    let lastMoveTs = 0;
+    let waveRAF = null;
+    let prevTickTs = null;
 
-    function measureChars() {
-      chars.forEach((c) => {
-        c.x = c.span.offsetLeft + c.span.offsetWidth / 2;
-      });
-    }
-    measureChars();
-    window.addEventListener("resize", measureChars);
+    function tick(ts) {
+      const dt = Math.min(ts - (prevTickTs || ts), 48);
+      prevTickTs = ts;
 
-    let ripples = [];
-    let lastSpawn = 0;
-    let rippleRAF = null;
+      energy *= Math.exp(-dt / WAVE_DECAY_MS);
+      phase += dt * WAVE_FLOW_SPEED * (0.3 + 0.7 * energy);
 
-    function tick() {
-      const now = performance.now();
-      ripples = ripples.filter((r) => now - r.start < RIPPLE_MAX_AGE_MS);
-
-      chars.forEach((c) => {
-        let offset = 0;
-        for (const r of ripples) {
-          const age = now - r.start;
-          const front = Math.abs(c.x - r.x) - RIPPLE_SPEED * age;
-          const envelope = Math.exp(-(front * front) / (2 * RIPPLE_SPREAD * RIPPLE_SPREAD)) * Math.exp(-age / RIPPLE_DECAY_MS);
-          offset += RIPPLE_AMPLITUDE * envelope * Math.sin(front * RIPPLE_WAVELENGTH);
-        }
-        c.span.style.transform = `translateY(${Math.max(-18, Math.min(18, offset)).toFixed(2)}px)`;
-      });
-
-      if (ripples.length) {
-        rippleRAF = requestAnimationFrame(tick);
-      } else {
-        rippleRAF = null;
-        chars.forEach((c) => (c.span.style.transform = ""));
+      if (energy < WAVE_EPSILON) {
+        displacementMap.setAttribute("scale", "0");
+        waveRAF = null;
+        prevTickTs = null;
+        return;
       }
+
+      displacementMap.setAttribute("scale", (energy * WAVE_MAX_SCALE).toFixed(2));
+      noiseFlow.setAttribute("dx", phase.toFixed(2));
+      noiseFlow.setAttribute("dy", (phase * 0.6).toFixed(2));
+      waveRAF = requestAnimationFrame(tick);
     }
 
     nameEl.addEventListener("mousemove", (e) => {
       const now = performance.now();
-      if (now - lastSpawn < RIPPLE_THROTTLE_MS) return;
-      lastSpawn = now;
-      const rect = nameEl.getBoundingClientRect();
-      ripples.push({ x: e.clientX - rect.left, start: now });
-      if (!rippleRAF) rippleRAF = requestAnimationFrame(tick);
+      if (lastMoveX != null) {
+        const dt = Math.max(now - lastMoveTs, 1);
+        const speed = Math.hypot(e.clientX - lastMoveX, e.clientY - lastMoveY) / dt;
+        energy = Math.min(1, energy + speed * WAVE_BUMP_PER_PXMS);
+      }
+      lastMoveX = e.clientX;
+      lastMoveY = e.clientY;
+      lastMoveTs = now;
+      if (!waveRAF) waveRAF = requestAnimationFrame(tick);
+    });
+
+    nameEl.addEventListener("mouseleave", () => {
+      lastMoveX = null;
+      lastMoveY = null;
     });
   }
 
@@ -1093,7 +1086,7 @@
     initModal();
     initScrollReveals();
     initResizeHandling();
-    initHeroNameRipple();
+    initHeroNameWave();
 
     if (document.body.dataset.page === "home") {
       buildReelSlides();

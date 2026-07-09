@@ -18,6 +18,15 @@
   <!-- Curseur custom (desktop only, géré/affiché en JS) -->
   <div id="custom-cursor" aria-hidden="true"></div>
 
+  <!-- Filtre de déformation "vague liquide" appliqué au nom en fond de hero (voir main.js) -->
+  <svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
+    <filter id="hero-name-wave" x="-20%" y="-100%" width="140%" height="300%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.012 0.09" numOctaves="2" seed="7" stitchTiles="stitch" result="noise"></feTurbulence>
+      <feOffset in="noise" dx="0" dy="0" result="noise-flow"></feOffset>
+      <feDisplacementMap id="hero-name-wave-map" in="SourceGraphic" in2="noise-flow" scale="0" xChannelSelector="R" yChannelSelector="G"></feDisplacementMap>
+    </filter>
+  </svg>
+
   <!-- Switcher FR/EN, toujours accessible -->
   <div class="lang-switcher" role="group" aria-label="Changer de langue">
     <button type="button" class="lang-btn is-active" data-lang-btn="fr" aria-pressed="true">FR</button>
