@@ -143,10 +143,11 @@
       const interactive = e.target.closest("a, button, .software-item, .orbit-node, .reel-slide");
 
       if (interactive) cursor.classList.add("is-hover");
-      if (orbitNode || reelSlide) {
+      // Le cylindre de nav (accueil) reste muet : seul le showcase projets affiche un label au survol.
+      const isNav = reelSlide && reelSlide.classList.contains("reel-slide--nav");
+      if (orbitNode || (reelSlide && !isNav)) {
         cursor.classList.add("is-label");
-        const isNav = reelSlide && reelSlide.classList.contains("reel-slide--nav");
-        cursor.setAttribute("data-cursor-label", isNav ? "OUVRIR" : "VOIR");
+        cursor.setAttribute("data-cursor-label", "VOIR");
       }
     });
 
@@ -216,9 +217,7 @@
     const thumbWrap = thumb && thumb.closest(".reel-pill-thumb");
 
     if (reelState.mode === "nav") {
-      const total = String(items.length).padStart(2, "0");
-      const current = String(idx + 1).padStart(2, "0");
-      if (label) label.textContent = `${I18N[state.lang][item.labelKey]} — ${current}/${total}`;
+      if (label) label.textContent = I18N[state.lang][item.labelKey];
       if (thumb) thumb.src = "";
       if (thumbWrap) {
         thumbWrap.classList.add("is-tint");
@@ -305,7 +304,6 @@
         const idx = i % n;
         return `
         <div class="reel-slide reel-slide--nav" data-index="${idx}" style="--slide-tint:${section.tint}">
-          <p class="reel-slide-index">${String(idx + 1).padStart(2, "0")}/${String(n).padStart(2, "0")}</p>
           <p class="reel-slide-title reel-slide-title--nav" data-i18n="${section.labelKey}">${I18N[state.lang][section.labelKey]}</p>
         </div>`;
       })

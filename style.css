@@ -457,14 +457,35 @@ img { max-width: 100%; display: block; }
 .hero--nav-only {
   padding: 24px;
 }
+/* Mot-clé géant en fond du hero : posé dans le flux juste au-dessus du cylindre,
+   avec une marge négative pour ne faire chevaucher que sa base (le nom reste
+   entièrement lisible, seul son pied se glisse derrière le cylindre plus modeste). */
+.hero-bg-name {
+  position: relative;
+  z-index: 0;
+  margin: 0 0 clamp(-56px, -7vw, -34px);
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-size: clamp(2.25rem, 8vw, 6.5rem);
+  color: rgba(255, 255, 255, 0.92);
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+}
+@media (max-width: 480px) {
+  .hero-bg-name { white-space: normal; text-align: center; max-width: 88vw; margin-bottom: -20px; }
+}
+
 .hero--nav-only .reel-wrapper {
-  width: min(1200px, 94vw);
+  width: min(680px, 78vw);
 }
 .hero--nav-only .reel {
-  height: clamp(240px, 34vw, 440px);
+  height: clamp(150px, 20vw, 240px);
 }
 .hero--nav-only .reel-slide {
-  flex: 0 0 clamp(260px, 38vw, 480px);
+  flex: 0 0 clamp(170px, 22vw, 260px);
 }
 
 .reel-slide--nav {
@@ -474,16 +495,6 @@ img { max-width: 100%; display: block; }
 .reel-slide--nav::before,
 .reel-slide--nav::after {
   content: none;
-}
-.reel-slide-index {
-  position: absolute;
-  left: 20px;
-  top: 18px;
-  z-index: 2;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  color: rgba(255, 255, 255, 0.75);
 }
 .reel-slide-title--nav {
   position: absolute;
