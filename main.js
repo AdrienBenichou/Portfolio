@@ -1010,12 +1010,13 @@
   }
 
   /* ============ EFFET DE VAGUE LIQUIDE AU SURVOL DU NOM EN FOND DE HERO ============ */
-  // Le nom est déformé via un filtre SVG (turbulence + displacement map, voir index.html) :
-  // chaque mouvement de souris ajoute de l'énergie à la vague (proportionnelle à la vitesse
-  // du curseur), qui se dissipe ensuite en continu ; plus on bouge, plus ça vague fort.
-  const WAVE_MAX_SCALE = 34; // amplitude max de la déformation (unités du displacement map)
-  const WAVE_DECAY_MS = 650; // constante de dissipation de l'énergie
-  const WAVE_BUMP_PER_PXMS = 0.9; // énergie ajoutée par unité de vitesse du curseur (px/ms)
+  // Le nom est déformé via un filtre SVG (turbulence + displacement map, voir index.html) ;
+  // un masque radial ("spot") qui suit la souris ne laisse voir la vague qu'autour du curseur.
+  // Chaque mouvement ajoute un peu d'énergie (proportionnelle à la vitesse), qui se dissipe
+  // ensuite en continu : plus on bouge, plus ça vague, et tout redevient net à l'arrêt.
+  const WAVE_MAX_SCALE = 11; // amplitude max de la déformation (unités du displacement map)
+  const WAVE_DECAY_MS = 550; // constante de dissipation de l'énergie
+  const WAVE_BUMP_PER_PXMS = 0.35; // énergie ajoutée par unité de vitesse du curseur (px/ms)
   const WAVE_FLOW_SPEED = 0.05; // vitesse de "l'écoulement" du bruit sous le texte
   const WAVE_EPSILON = 0.004;
 
@@ -1023,7 +1024,8 @@
     const nameEl = document.getElementById("hero-bg-name");
     const displacementMap = document.getElementById("hero-name-wave-map");
     const noiseFlow = document.querySelector("#hero-name-wave feOffset");
-    if (!nameEl || !displacementMap || !noiseFlow) return;
+    const spot = document.getElementById("hero-name-spot-gradient");
+    if (!nameEl || !displacementMap || !noiseFlow || !spot) return;
     if (state.reducedMotion || !window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
 
     let energy = 0;
@@ -1056,6 +1058,10 @@
 
     nameEl.addEventListener("mousemove", (e) => {
       const now = performance.now();
+      const rect = nameEl.getBoundingClientRect();
+      spot.setAttribute("cx", (e.clientX - rect.left).toFixed(1));
+      spot.setAttribute("cy", (e.clientY - rect.top).toFixed(1));
+
       if (lastMoveX != null) {
         const dt = Math.max(now - lastMoveTs, 1);
         const speed = Math.hypot(e.clientX - lastMoveX, e.clientY - lastMoveY) / dt;
