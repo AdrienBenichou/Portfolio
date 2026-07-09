@@ -1009,71 +1009,114 @@
     });
   }
 
-  /* ============ EFFET DE VAGUE LIQUIDE AU SURVOL DU NOM EN FOND DE HERO ============ */
-  // Le nom est déformé via un filtre SVG (turbulence + displacement map, voir index.html) ;
-  // un masque radial ("spot") qui suit la souris ne laisse voir la vague qu'autour du curseur.
-  // Chaque mouvement ajoute un peu d'énergie (proportionnelle à la vitesse), qui se dissipe
-  // ensuite en continu : plus on bouge, plus ça vague, et tout redevient net à l'arrêt.
-  const WAVE_MAX_SCALE = 11; // amplitude max de la déformation (unités du displacement map)
-  const WAVE_DECAY_MS = 550; // constante de dissipation de l'énergie
-  const WAVE_BUMP_PER_PXMS = 0.35; // énergie ajoutée par unité de vitesse du curseur (px/ms)
-  const WAVE_FLOW_SPEED = 0.05; // vitesse de "l'écoulement" du bruit sous le texte
-  const WAVE_EPSILON = 0.004;
+  /* ============ REBOND VERTICAL DU NOM EN FOND DE HERO (façon balle de basket) ============ */
+  // Au chargement, le nom tombe légèrement, touche le sol (sa position naturelle) et rebondit
+  // avec élasticité jusqu'à stabilisation. Survoler/bouger la souris injecte de l'énergie
+  // (plus on stimule, plus le rebond est ample) ; sans interaction, l'amplitude redescend
+  // progressivement. La hauteur est toujours plafonnée pour ne jamais sortir de l'écran.
+  const BOUNCE_GRAVITY = 0.0022; // px/ms² — accélère le retour vers le sol (y = 0)
+  const BOUNCE_RESTITUTION = 0.6; // fraction de vitesse conservée à chaque rebond
+  const BOUNCE_MAX_RISE = -40; // px — plafond absolu (sécurité anti-débordement d'écran)
+  const BOUNCE_KICK_PER_PXMS = 0.007; // impulsion ajoutée par vitesse de la souris (par événement)
+  const BOUNCE_MAX_KICK = 0.15; // impulsion max par événement (évite un rebond trop violent)
+  const BOUNCE_ENTER_KICK = 0.12; // petite impulsion pour "réveiller" le rebond à l'entrée de la souris
+  // Une force continue ne ferait que lutter contre la gravité sans jamais faire grandir le rebond
+  // (comme pousser une balançoire en continu au lieu de la relancer au bon moment) : on booste donc
+  // la vitesse à chaque contact avec le sol tant que la souris survole, comme quand on fait rebondir
+  // un ballon de basket à la main.
+  const BOUNCE_HOVER_BOOST = 0.09; // px/ms ajoutés à la vitesse de rebond à chaque contact, si survolé
+  const BOUNCE_SETTLE_EPS_Y = 0.05;
+  const BOUNCE_SETTLE_EPS_V = 0.01;
 
-  function initHeroNameWave() {
+  function initHeroNameBounce() {
     const nameEl = document.getElementById("hero-bg-name");
-    const displacementMap = document.getElementById("hero-name-wave-map");
-    const noiseFlow = document.querySelector("#hero-name-wave feOffset");
-    const spot = document.getElementById("hero-name-spot-gradient");
-    if (!nameEl || !displacementMap || !noiseFlow || !spot) return;
-    if (state.reducedMotion || !window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+    if (!nameEl || state.reducedMotion) return;
 
-    let energy = 0;
-    let phase = 0;
+    let y = -18; // légère chute d'entrée depuis au-dessus de la position naturelle
+    let vy = 0;
+    let hovered = false;
     let lastMoveX = null;
     let lastMoveY = null;
     let lastMoveTs = 0;
-    let waveRAF = null;
+    let bounceRAF = null;
     let prevTickTs = null;
+    let maxRise = BOUNCE_MAX_RISE;
+
+    function computeMaxRise() {
+      const rect = nameEl.getBoundingClientRect();
+      // Ne jamais laisser le nom dépasser le haut du viewport, même sur un écran très court.
+      const available = Math.max(0, rect.top - 12);
+      maxRise = -Math.min(-BOUNCE_MAX_RISE, available);
+    }
+    computeMaxRise();
+    window.addEventListener("resize", computeMaxRise);
+
+    function settle() {
+      y = 0;
+      vy = 0;
+      bounceRAF = null;
+      prevTickTs = null;
+      nameEl.style.transform = "";
+    }
 
     function tick(ts) {
       const dt = Math.min(ts - (prevTickTs || ts), 48);
       prevTickTs = ts;
 
-      energy *= Math.exp(-dt / WAVE_DECAY_MS);
-      phase += dt * WAVE_FLOW_SPEED * (0.3 + 0.7 * energy);
+      vy += BOUNCE_GRAVITY * dt;
+      y += vy * dt;
 
-      if (energy < WAVE_EPSILON) {
-        displacementMap.setAttribute("scale", "0");
-        waveRAF = null;
-        prevTickTs = null;
+      if (y >= 0) {
+        y = 0;
+        if (vy > 0) {
+          vy = -(vy * BOUNCE_RESTITUTION + (hovered ? BOUNCE_HOVER_BOOST : 0));
+        }
+      }
+      if (y < maxRise) {
+        y = maxRise;
+        if (vy < 0) vy = 0;
+      }
+
+      if (!hovered && Math.abs(y) < BOUNCE_SETTLE_EPS_Y && Math.abs(vy) < BOUNCE_SETTLE_EPS_V) {
+        settle();
         return;
       }
 
-      displacementMap.setAttribute("scale", (energy * WAVE_MAX_SCALE).toFixed(2));
-      noiseFlow.setAttribute("dx", phase.toFixed(2));
-      noiseFlow.setAttribute("dy", (phase * 0.6).toFixed(2));
-      waveRAF = requestAnimationFrame(tick);
+      nameEl.style.transform = `translateY(${y.toFixed(2)}px)`;
+      bounceRAF = requestAnimationFrame(tick);
     }
+
+    function ensureRunning() {
+      if (!bounceRAF) bounceRAF = requestAnimationFrame(tick);
+    }
+
+    ensureRunning();
+
+    nameEl.addEventListener("mouseenter", () => {
+      hovered = true;
+      // Si le nom est déjà parfaitement immobile, une petite impulsion relance le rebond
+      // (sinon il n'y a pas de contact au sol sur lequel appliquer le boost de survol).
+      if (Math.abs(vy) < BOUNCE_SETTLE_EPS_V && Math.abs(y) < BOUNCE_SETTLE_EPS_Y) {
+        vy = -BOUNCE_ENTER_KICK;
+      }
+      ensureRunning();
+    });
 
     nameEl.addEventListener("mousemove", (e) => {
       const now = performance.now();
-      const rect = nameEl.getBoundingClientRect();
-      spot.setAttribute("cx", (e.clientX - rect.left).toFixed(1));
-      spot.setAttribute("cy", (e.clientY - rect.top).toFixed(1));
-
       if (lastMoveX != null) {
         const dt = Math.max(now - lastMoveTs, 1);
         const speed = Math.hypot(e.clientX - lastMoveX, e.clientY - lastMoveY) / dt;
-        energy = Math.min(1, energy + speed * WAVE_BUMP_PER_PXMS);
+        vy -= Math.min(speed * BOUNCE_KICK_PER_PXMS, BOUNCE_MAX_KICK);
       }
       lastMoveX = e.clientX;
       lastMoveY = e.clientY;
       lastMoveTs = now;
-      if (!waveRAF) waveRAF = requestAnimationFrame(tick);
+      ensureRunning();
     });
 
     nameEl.addEventListener("mouseleave", () => {
+      hovered = false;
       lastMoveX = null;
       lastMoveY = null;
     });
@@ -1092,7 +1135,7 @@
     initModal();
     initScrollReveals();
     initResizeHandling();
-    initHeroNameWave();
+    initHeroNameBounce();
 
     if (document.body.dataset.page === "home") {
       buildReelSlides();

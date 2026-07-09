@@ -18,30 +18,6 @@
   <!-- Curseur custom (desktop only, géré/affiché en JS) -->
   <div id="custom-cursor" aria-hidden="true"></div>
 
-  <!-- Filtre de déformation "vague liquide" appliqué au nom en fond de hero (voir main.js) :
-       la turbulence déforme tout le texte, mais un masque radial ("spot") qui suit la souris
-       ne laisse apparaître cette déformation qu'autour du curseur. -->
-  <svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
-    <defs>
-      <radialGradient id="hero-name-spot-gradient" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="110">
-        <stop offset="0%" stop-color="#ffffff" stop-opacity="1"></stop>
-        <stop offset="100%" stop-color="#ffffff" stop-opacity="0"></stop>
-      </radialGradient>
-      <rect id="hero-name-spot-rect" x="-4000" y="-4000" width="8000" height="8000" fill="url(#hero-name-spot-gradient)"></rect>
-    </defs>
-    <filter id="hero-name-wave" x="-20%" y="-100%" width="140%" height="300%" color-interpolation-filters="sRGB">
-      <feTurbulence type="fractalNoise" baseFrequency="0.012 0.09" numOctaves="2" seed="7" stitchTiles="stitch" result="noise"></feTurbulence>
-      <feOffset in="noise" dx="0" dy="0" result="noise-flow"></feOffset>
-      <feDisplacementMap id="hero-name-wave-map" in="SourceGraphic" in2="noise-flow" scale="0" xChannelSelector="R" yChannelSelector="G" result="displaced"></feDisplacementMap>
-      <feImage xlink:href="#hero-name-spot-rect" x="-4000" y="-4000" width="8000" height="8000" result="spot"></feImage>
-      <feComposite in="displaced" in2="spot" operator="in" result="displaced-masked"></feComposite>
-      <feMerge>
-        <feMergeNode in="SourceGraphic"></feMergeNode>
-        <feMergeNode in="displaced-masked"></feMergeNode>
-      </feMerge>
-    </filter>
-  </svg>
-
   <!-- Switcher FR/EN, toujours accessible -->
   <div class="lang-switcher" role="group" aria-label="Changer de langue">
     <button type="button" class="lang-btn is-active" data-lang-btn="fr" aria-pressed="true">FR</button>
