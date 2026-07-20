@@ -450,18 +450,156 @@
   // Un item de fiche est un objet normalisé, identique quelle que soit la section d'origine
   // (Airtable expose des colonnes différentes par table) — c'est ce qui alimente à la fois la
   // pile du hero, les grilles/listes de chaque page, et la fiche elle-même.
+
+  function attachmentList(field) {
+    if (!Array.isArray(field)) return [];
+    return field.map((a) => ({ url: a.url, label: a.filename || "Document" })).filter((a) => a.url);
+  }
+  function attachmentUrls(field) {
+    return attachmentList(field).map((a) => a.url);
+  }
+  // Le champ Airtable "Missions" est un texte long, une puce "• " par ligne (comme "Description").
+  function splitBulletField(text) {
+    if (!text) return [];
+    if (Array.isArray(text)) return text;
+    return text
+      .split(/\n+/)
+      .map((l) => l.trim().replace(/^[•\-]\s+/, ""))
+      .filter(Boolean);
+  }
+
+  // Segments **gras** / <a href="">liens</a> pour un rendu inline fidèle au texte Airtable
+  // (mêmes conventions que celles tapées dans les champs longs : gras markdown, liens HTML).
+  function parseInline(text) {
+    if (!text) return [];
+    const t = String(text).replace(/<\/?u>/g, "");
+    const segments = [];
+    const regex = /<a\s+href="([^"]*)">([^<]*)<\/a>|\*\*(.*?)\*\*/g;
+    let lastIndex = 0;
+    let m;
+    while ((m = regex.exec(t))) {
+      if (m.index > lastIndex) segments.push({ kind: "text", text: t.slice(lastIndex, m.index) });
+      if (m[1] !== undefined) segments.push({ kind: "link", text: m[2], href: m[1] });
+      else segments.push({ kind: "bold", text: m[3] });
+      lastIndex = regex.lastIndex;
+    }
+    if (lastIndex < t.length) segments.push({ kind: "text", text: t.slice(lastIndex) });
+    return segments;
+  }
+
+  function inlineHtml(segments) {
+    return segments
+      .map((s) => {
+        const safe = s.text;
+        if (s.kind === "bold") return `<strong>${safe}</strong>`;
+        if (s.kind === "link") return `<a href="${s.href}" target="_blank" rel="noopener">${safe}</a>`;
+        return safe;
+      })
+      .join("");
+  }
+
+  // Repère "Description" combiné (pas d'Aperçu/Missions séparés dans Airtable) en blocs
+  // intro / puces missions / clôture — même heuristique que le composant Claude Design.
+  function splitDescriptionIntoBlocks(description) {
+    const blocks = (description || "").split(/\n\n+/).map((b) => b.trim()).filter(Boolean);
+    const introParagraphs = [];
+    const missions = [];
+    const closingParagraphs = [];
+    let seenMissions = false;
+    for (const block of blocks) {
+      const lines = block.split("\n").map((l) => l.trim()).filter(Boolean);
+      const isBulletBlock = lines.some((l) => /^[•\-]\s+/.test(l));
+      const strippedBlock = block.replace(/<\/?u>/g, "").trim();
+      const isHeadingOnly = strippedBlock.length < 60 && /^[a-zàâéèêëîïôûù\s]+:?$/i.test(strippedBlock) && /mission/i.test(strippedBlock);
+      if (isHeadingOnly) {
+        seenMissions = true;
+        continue;
+      }
+      if (isBulletBlock) {
+        seenMissions = true;
+        for (const l of lines) {
+          if (/^[•\-]\s+/.test(l)) missions.push(l.replace(/^[•\-]\s+/, ""));
+          else if (missions.length) missions[missions.length - 1] += " " + l;
+        }
+        continue;
+      }
+      if (!seenMissions) introParagraphs.push(block);
+      else closingParagraphs.push(block);
+    }
+    return { introParagraphs, missions, closingParagraphs };
+  }
+
+  // Construit les onglets de la fiche (Aperçu, Missions, À propos, Documents) à partir d'un
+  // objet "brut" normalisé — ne garde que les onglets qui ont réellement du contenu.
+  function buildFicheTabs(raw) {
+    let introParagraphs = [];
+    let missions = [];
+    let closingParagraphs = [];
+    if (raw.apercu || (raw.missions && raw.missions.length)) {
+      introParagraphs = (raw.apercu || "").split(/\n\n+/).map((b) => b.trim()).filter(Boolean);
+      missions = raw.missions || [];
+    } else {
+      const split = splitDescriptionIntoBlocks(raw.description);
+      introParagraphs = split.introParagraphs;
+      missions = split.missions;
+      closingParagraphs = split.closingParagraphs;
+    }
+
+    const toBlocks = (paras) => paras.map((p) => ({ isMission: false, segments: parseInline(p) }));
+    const missionBlocks = missions.map((m) => ({ isMission: true, segments: parseInline(m) }));
+
+    const aboutLines = [];
+    if (raw.entrepriseDescription) aboutLines.push(raw.entrepriseDescription);
+    (raw.links || []).forEach((l) => {
+      if (!l.url) return;
+      const label = l.label || l.url.replace(/^https?:\/\//, "").replace(/\/$/, "");
+      aboutLines.push(`${l.emoji || "🔗"} <a href="${l.url}">${label}</a>`);
+    });
+    const aboutBlocks = aboutLines.map((p) => ({ isMission: false, segments: parseInline(p) }));
+
+    const tabs = [];
+    const apercuBlocks = [...toBlocks(introParagraphs), ...toBlocks(closingParagraphs)];
+    if (apercuBlocks.length) tabs.push({ key: "apercu", label: "Aperçu", kind: "text", dotColor: "#FF6B35", blocks: apercuBlocks });
+    if (missionBlocks.length) tabs.push({ key: "missions", label: "Missions", kind: "text", dotColor: "#0E7C86", blocks: missionBlocks });
+    if (aboutBlocks.length) {
+      tabs.push({ key: "apropos", label: raw.kicker ? `À propos · ${raw.kicker}` : "À propos", kind: "text", dotColor: "#1B4FDB", blocks: aboutBlocks });
+    }
+    const hasDocs = (raw.documentPhotos && raw.documentPhotos.length) || (raw.documentPdfs && raw.documentPdfs.length);
+    if (hasDocs) {
+      tabs.push({ key: "documents", label: "Documents", kind: "documents", dotColor: "#D6336C", photos: raw.documentPhotos || [], pdfs: raw.documentPdfs || [] });
+    }
+    return tabs;
+  }
+
+  // Assemble l'objet fiche final (affichage + onglets) à partir d'un objet brut normalisé.
+  function finalizeFiche(raw) {
+    return {
+      title: raw.title || "",
+      kicker: raw.kicker || "",
+      subtitle: raw.subtitle || "",
+      coverUrl: raw.coverUrl || "",
+      isProfile: !!raw.isProfile,
+      tint: raw.tint,
+      dateChips: raw.dateChips || [],
+      lieu: raw.lieu || "",
+      competences: raw.competences || [],
+      tabs: buildFicheTabs(raw),
+    };
+  }
+
   function getMoiProfile() {
     if (!state.data) return [];
     const moi = (state.data.moi && state.data.moi[0]) || null;
     if (!moi) return [];
-    const photo = Array.isArray(moi["Photo"]) && moi["Photo"][0] ? moi["Photo"][0].url : "";
+    const cover = attachmentUrls(moi["Cover"])[0] || attachmentUrls(moi["Photo"])[0] || "";
+    const photo = attachmentUrls(moi["Photo"])[0] || "";
     const subtitle = [moi["Age"] ? `${moi["Age"]} ans` : "", moi["Lieu"] || ""].filter(Boolean).join(" · ");
     const competences = [
       moi["Français"] ? `Français — ${moi["Français"]}` : "",
       moi["Anglais"] ? `Anglais — ${moi["Anglais"]}` : "",
       moi["Allemand"] ? `Allemand — ${moi["Allemand"]}` : "",
     ].filter(Boolean);
-    return [{ title: moi["Nom"] || "Adrien Benichou", subtitle, coverUrl: photo, description: moi["Description"] || "", competences }];
+    return [{ title: moi["Nom"] || "Adrien Benichou", subtitle, cover, photo, description: moi["Description"] || "", competences }];
   }
 
   function getSoftwaresSorted() {
@@ -469,8 +607,7 @@
     return [...(state.data.softwares || [])].sort((a, b) => (a["Rang"] || 0) - (b["Rang"] || 0));
   }
   function softwareLogo(sw) {
-    const logo = sw["Logo"];
-    return Array.isArray(logo) && logo[0] ? logo[0].url : "";
+    return attachmentUrls(sw["Logo"])[0] || "";
   }
 
   function getDiplomesSorted() {
@@ -499,18 +636,26 @@
 
   function buildProjectFiche(p, tint) {
     const kicker = projectByline(p);
-    return {
+    const links = [];
+    if (p["Lien"]) links.push({ url: p["Lien"], emoji: "🔗" });
+    return finalizeFiche({
       title: projectTitle(p),
       kicker,
       subtitle: kicker,
       coverUrl: projectCover(p),
       isProfile: false,
-      dateChips: [projectDateText(p), formatProjectDate(p)].filter(Boolean),
-      lieu: "",
-      competences: p["Compétences"] || [],
-      description: p["Description"] || "",
       tint,
-    };
+      dateChips: [projectDateText(p), formatProjectDate(p)].filter(Boolean),
+      lieu: p["Lieu"] || "",
+      competences: p["Compétences"] || [],
+      apercu: p["Aperçu"] || "",
+      missions: splitBulletField(p["Missions"]),
+      description: p["Description"] || "",
+      entrepriseDescription: p["Description de l'entreprise"] || "",
+      links,
+      documentPdfs: attachmentList(p["Document"]).concat(attachmentList(p["PDF"])).concat(attachmentList(p["Fichiers"])),
+      documentPhotos: attachmentUrls(p["Photo"]),
+    });
   }
 
   // Items de fiche normalisés pour une section — même source pour la pile du hero et pour
@@ -519,61 +664,67 @@
     const section = NAV_SECTIONS.find((s) => s.id === sectionId);
     const tint = section ? section.tint : "#1B4FDB";
     if (sectionId === "apropos") {
-      return getMoiProfile().map((m) => ({
-        title: m.title,
-        kicker: "",
-        subtitle: m.subtitle,
-        coverUrl: m.coverUrl,
-        isProfile: true,
-        dateChips: m.subtitle ? [m.subtitle] : [],
-        lieu: "",
-        competences: m.competences,
-        description: m.description,
-        tint,
-      }));
+      return getMoiProfile().map((m) =>
+        finalizeFiche({
+          title: m.title,
+          subtitle: m.subtitle,
+          coverUrl: m.cover,
+          isProfile: true,
+          tint,
+          dateChips: m.subtitle ? [m.subtitle] : [],
+          competences: m.competences,
+          description: m.description,
+        })
+      );
     }
     if (sectionId === "projets") return getAllProjects().map((p) => buildProjectFiche(p, tint));
     if (sectionId === "softwares") {
-      return getSoftwaresSorted().map((sw) => ({
-        title: sw["Logiciel"] || "",
-        kicker: sw["Type"] || "",
-        subtitle: sw["Type"] || "",
-        coverUrl: softwareLogo(sw),
-        isProfile: false,
-        dateChips: [],
-        lieu: "",
-        competences: [],
-        description: "",
-        tint,
-      }));
+      return getSoftwaresSorted().map((sw) =>
+        finalizeFiche({
+          title: sw["Logiciel"] || "",
+          kicker: sw["Type"] || "",
+          subtitle: sw["Type"] || "",
+          coverUrl: softwareLogo(sw),
+          tint,
+          description: sw["Exemples"] || "",
+          links: sw["Lien"] ? [{ url: sw["Lien"], emoji: "🔗" }] : [],
+          documentPdfs: attachmentList(sw["PDF"]),
+        })
+      );
     }
     if (sectionId === "diplomes") {
-      return getDiplomesSorted().map((d) => ({
-        title: d["Nom"] || "",
-        kicker: d["Etablissement"] || "",
-        subtitle: d["Etablissement"] || "",
-        coverUrl: "",
-        isProfile: false,
-        dateChips: [d["Date (texte)"]].filter(Boolean),
-        lieu: "",
-        competences: [],
-        description: d["Description"] || "",
-        tint,
-      }));
+      return getDiplomesSorted().map((d) =>
+        finalizeFiche({
+          title: d["Nom"] || "",
+          kicker: d["Etablissement"] || "",
+          subtitle: d["Etablissement"] || "",
+          coverUrl: attachmentUrls(d["Cover de file"])[0] || "",
+          tint,
+          dateChips: [d["Date (texte)"]].filter(Boolean),
+          competences: d["Etiquettes"] || [],
+          description: d["Description"] || "",
+          links: d["Site web"] ? [{ url: d["Site web"], emoji: "🔗" }] : [],
+          documentPdfs: attachmentList(d["PDF"]).concat(attachmentList(d["Fichiers"])),
+        })
+      );
     }
     if (sectionId === "benevolat") {
-      return getBenevolatList().map((b) => ({
-        title: b["Mission"] || "",
-        kicker: b["Etiquette"] || "",
-        subtitle: b["Etiquette"] || "",
-        coverUrl: "",
-        isProfile: false,
-        dateChips: [b["Date (texte)"] || b["Date"]].filter(Boolean),
-        lieu: b["Lieu"] || "",
-        competences: [],
-        description: b["Description"] || "",
-        tint,
-      }));
+      return getBenevolatList().map((b) =>
+        finalizeFiche({
+          title: b["Mission"] || "",
+          kicker: b["Etiquette"] || "",
+          subtitle: b["Etiquette"] || "",
+          coverUrl: attachmentUrls(b["Cover"])[0] || "",
+          tint,
+          dateChips: [b["Date (texte)"] || b["Date"]].filter(Boolean),
+          lieu: b["Lieu"] || "",
+          description: b["Description"] || "",
+          links: [
+            b["Site web"] ? { url: b["Site web"], emoji: "🔗" } : null,
+            b["Vidéo"] ? { url: b["Vidéo"], emoji: "🎥", label: "Vidéo" } : null,
+          ].filter(Boolean),
+        })
+      );
     }
     return [];
   }
@@ -608,7 +759,8 @@
         <div class="fiche-meta-row"></div>
         <div class="fiche-competences-row"></div>
         <div class="fiche-divider"></div>
-        <p class="fiche-description"></p>
+        <div class="fiche-tab-bar"></div>
+        <div class="fiche-panel-box"></div>
       </div>`;
     modal.querySelector(".fiche-close-btn").addEventListener("click", closeFiche);
 
@@ -623,6 +775,8 @@
   function renderFicheContent(item) {
     const modal = document.getElementById("fiche-modal");
     if (!modal) return;
+    modal._item = item;
+    modal._activeTab = 0;
 
     const cover = modal.querySelector(".fiche-cover");
     cover.style.background = item.coverUrl ? `#1a1c22 url("${item.coverUrl}") center/cover no-repeat` : `linear-gradient(160deg, ${item.tint || "#1B4FDB"}, #0d0e12)`;
@@ -655,9 +809,62 @@
       .join("");
     compRow.style.display = (item.competences || []).length ? "flex" : "none";
 
-    const desc = modal.querySelector(".fiche-description");
-    desc.textContent = item.description || "";
-    desc.style.display = item.description ? "block" : "none";
+    renderFicheTabBar(modal);
+    renderFichePanel(modal);
+  }
+
+  function renderFicheTabBar(modal) {
+    const tabs = modal._item.tabs;
+    const tabBar = modal.querySelector(".fiche-tab-bar");
+    if (!tabs.length) {
+      tabBar.style.display = "none";
+      tabBar.innerHTML = "";
+      return;
+    }
+    tabBar.style.display = "flex";
+    tabBar.innerHTML = tabs
+      .map((t, i) => {
+        const active = i === modal._activeTab;
+        return `<button type="button" class="fiche-tab${active ? " is-active" : ""}" data-tab-index="${i}">
+          <span class="fiche-tab-dot" style="background:${t.dotColor}; opacity:${active ? 1 : 0.5};"></span>
+          <span>${t.label}</span>
+        </button>`;
+      })
+      .join("");
+    tabBar.querySelectorAll(".fiche-tab").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        modal._activeTab = parseInt(btn.getAttribute("data-tab-index"), 10);
+        renderFicheTabBar(modal);
+        renderFichePanel(modal);
+      });
+    });
+  }
+
+  function renderFichePanel(modal) {
+    const tabs = modal._item.tabs;
+    const panelBox = modal.querySelector(".fiche-panel-box");
+    const tab = tabs[modal._activeTab];
+    if (!tab) {
+      panelBox.innerHTML = "";
+      return;
+    }
+    if (tab.kind === "documents") {
+      const photosHtml = tab.photos.length
+        ? `<div class="fiche-doc-grid">${tab.photos.map((url) => `<div class="fiche-doc-photo" style="background-image:url('${url}')"></div>`).join("")}</div>`
+        : "";
+      const pdfsHtml = tab.pdfs
+        .map((pdf) => `<a href="${pdf.url}" target="_blank" rel="noopener" class="fiche-doc-pdf-row"><span class="fiche-doc-pdf-icon">📄</span><span class="fiche-doc-pdf-label">${pdf.label}</span></a>`)
+        .join("");
+      panelBox.innerHTML = photosHtml + pdfsHtml;
+      return;
+    }
+    panelBox.innerHTML = tab.blocks
+      .map((b) => {
+        const html = inlineHtml(b.segments);
+        if (b.isMission) return `<div class="fiche-mission-row"><span class="fiche-mission-dot"></span><p class="fiche-text-block">${html}</p></div>`;
+        return `<p class="fiche-text-block">${html}</p>`;
+      })
+      .join("");
   }
 
   function openFiche(item, originEl) {
@@ -676,6 +883,7 @@
       : `translate(${vw / 2 - 60}px, ${vh / 2 - 40}px) scale(0.02, 0.02)`;
 
     modal._fromTransform = fromTransform;
+    modal.scrollTop = 0;
     document.body.style.overflow = "hidden";
     modal.hidden = false;
     backdrop.hidden = false;
@@ -815,7 +1023,7 @@
     if (cta) {
       cta.addEventListener("click", (e) => {
         e.preventDefault();
-        navigateToPage(cta.getAttribute("href"));
+        openAllProjects();
       });
     }
 
@@ -1140,7 +1348,6 @@
 
     renderOrbit();
     buildReelSlides();
-    initProjetsAllGrid();
 
     document.querySelectorAll(".filter-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -1200,66 +1407,97 @@
     if (projects.length) showOrbitPreview(0);
   }
 
-  // Grille filtrable "Tous mes projets" — remplace l'orbite en dessous de 720px (voir CSS).
-  // Filtres multi-sélection par Type / Compétence / Organisation, à partir des champs
-  // Airtable réels (Date text, Compétences, Entreprise/Etude) déjà utilisés par l'orbite.
-  const projetsAllGridState = { filterType: [], filterComp: [], filterOrg: [], openGroup: null };
+  // Écran "Tous mes projets" — overlay plein écran global (injecté une fois, comme la fiche),
+  // ouvert depuis le CTA du hero mobile. Filtres multi-sélection par Type / Compétence /
+  // Organisation à partir des champs Airtable réels déjà utilisés par l'orbite.
+  const allProjectsState = { filterType: [], filterComp: [], filterOrg: [], openGroup: null };
 
-  function initProjetsAllGrid() {
-    const filterBar = document.getElementById("projets-mobile-filterbar");
-    const grid = document.getElementById("projets-mobile-grid");
-    if (!filterBar || !grid) return; // page sans grille mobile
+  function initAllProjectsOverlay() {
+    if (document.getElementById("all-projects-overlay")) return;
 
+    const overlay = document.createElement("div");
+    overlay.id = "all-projects-overlay";
+    overlay.className = "all-projects-overlay";
+    overlay.hidden = true;
+    overlay.innerHTML = `
+      <div class="all-projects-header">
+        <button type="button" class="all-projects-back" aria-label="Fermer">←</button>
+        <p class="all-projects-title">Tous mes projets</p>
+      </div>
+      <div class="all-projects-filterbar" id="all-projects-filterbar"></div>
+      <div class="all-projects-grid" id="all-projects-grid"></div>`;
+    document.body.appendChild(overlay);
+
+    overlay.querySelector(".all-projects-back").addEventListener("click", closeAllProjects);
+
+    const filterBar = overlay.querySelector("#all-projects-filterbar");
     filterBar.addEventListener("click", (e) => {
-      const groupBtn = e.target.closest(".projets-mobile-filter-btn");
-      const chip = e.target.closest(".projets-mobile-filter-chip");
-      const reset = e.target.closest(".projets-mobile-reset");
+      const groupBtn = e.target.closest(".all-projects-filter-btn");
+      const chip = e.target.closest(".all-projects-filter-chip");
+      const reset = e.target.closest(".all-projects-reset");
       if (groupBtn) {
         const key = groupBtn.getAttribute("data-group");
-        projetsAllGridState.openGroup = projetsAllGridState.openGroup === key ? null : key;
-        renderProjetsAllGrid();
+        allProjectsState.openGroup = allProjectsState.openGroup === key ? null : key;
+        renderAllProjectsGrid();
       } else if (chip) {
         const key = chip.getAttribute("data-group");
         const value = chip.getAttribute("data-value");
-        const list = projetsAllGridState[key];
+        const list = allProjectsState[key];
         const idx = list.indexOf(value);
         if (idx === -1) list.push(value);
         else list.splice(idx, 1);
-        renderProjetsAllGrid();
+        renderAllProjectsGrid();
       } else if (reset) {
-        projetsAllGridState.filterType = [];
-        projetsAllGridState.filterComp = [];
-        projetsAllGridState.filterOrg = [];
-        projetsAllGridState.openGroup = null;
-        renderProjetsAllGrid();
+        allProjectsState.filterType = [];
+        allProjectsState.filterComp = [];
+        allProjectsState.filterOrg = [];
+        allProjectsState.openGroup = null;
+        renderAllProjectsGrid();
       }
     });
 
-    grid.addEventListener("click", (e) => {
-      const card = e.target.closest(".projets-mobile-card");
+    overlay.querySelector("#all-projects-grid").addEventListener("click", (e) => {
+      const card = e.target.closest(".all-projects-card");
       if (!card) return;
       const project = getAllProjects()[parseInt(card.getAttribute("data-index"), 10)];
       if (project) openProjectFiche(project, card);
     });
 
     document.addEventListener("click", (e) => {
-      if (!projetsAllGridState.openGroup) return;
-      if (!e.target.closest(".projets-mobile-filter-group")) {
-        projetsAllGridState.openGroup = null;
-        renderProjetsAllGrid();
+      if (!allProjectsState.openGroup) return;
+      if (!e.target.closest(".all-projects-filter-group")) {
+        allProjectsState.openGroup = null;
+        renderAllProjectsGrid();
       }
     });
 
-    renderProjetsAllGrid();
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeAllProjects();
+    });
   }
 
-  function renderProjetsAllGrid() {
-    const filterBar = document.getElementById("projets-mobile-filterbar");
-    const grid = document.getElementById("projets-mobile-grid");
+  function openAllProjects() {
+    const overlay = document.getElementById("all-projects-overlay");
+    if (!overlay) return;
+    renderAllProjectsGrid();
+    overlay.hidden = false;
+    document.body.style.overflow = "hidden";
+  }
+
+  function closeAllProjects() {
+    const overlay = document.getElementById("all-projects-overlay");
+    if (!overlay || overlay.hidden) return;
+    overlay.hidden = true;
+    document.body.style.overflow = "";
+  }
+
+  function renderAllProjectsGrid() {
+    const filterBar = document.getElementById("all-projects-filterbar");
+    const grid = document.getElementById("all-projects-grid");
     if (!filterBar || !grid) return;
 
     const all = getAllProjects();
-    const s = projetsAllGridState;
+    const s = allProjectsState;
     const groups = [
       { key: "filterType", title: "Type", values: Array.from(new Set(all.map(projectDateText).filter(Boolean))) },
       { key: "filterComp", title: "Compétence", values: Array.from(new Set(all.flatMap((p) => p["Compétences"] || []))) },
@@ -1273,22 +1511,22 @@
           const active = s[g.key];
           const isOpen = s.openGroup === g.key;
           return `
-        <div class="projets-mobile-filter-group">
-          <button type="button" class="projets-mobile-filter-btn${active.length ? " is-active" : ""}" data-group="${g.key}">
-            ${g.title}${active.length ? ` (${active.length})` : ""} <span class="projets-mobile-filter-chevron">▾</span>
+        <div class="all-projects-filter-group">
+          <button type="button" class="all-projects-filter-btn${active.length ? " is-active" : ""}" data-group="${g.key}">
+            <span>${g.title}${active.length ? ` (${active.length})` : ""}</span> <span class="all-projects-filter-chevron">▾</span>
           </button>
           ${
             isOpen
-              ? `<div class="projets-mobile-filter-menu">${g.values
+              ? `<div class="all-projects-filter-menu">${g.values
                   .map(
-                    (v) => `<button type="button" class="projets-mobile-filter-chip${active.includes(v) ? " is-active" : ""}" data-group="${g.key}" data-value="${v}">${v}</button>`
+                    (v) => `<button type="button" class="all-projects-filter-chip${active.includes(v) ? " is-active" : ""}" data-group="${g.key}" data-value="${v}">${v}</button>`
                   )
                   .join("")}</div>`
               : ""
           }
         </div>`;
         })
-        .join("") + (activeCount ? `<button type="button" class="projets-mobile-reset">Réinitialiser</button>` : "");
+        .join("") + (activeCount ? `<button type="button" class="all-projects-reset">Réinitialiser</button>` : "");
 
     const filtered = all
       .map((p, i) => ({ p, i }))
@@ -1300,10 +1538,10 @@
       .map(({ p, i }) => {
         const cover = projectCover(p);
         return `
-        <button type="button" class="projets-mobile-card" data-index="${i}">
-          <div class="projets-mobile-card-media"${cover ? ` style="background-image:url('${cover}')"` : ""}></div>
-          <p class="projets-mobile-card-title">${projectTitle(p)}</p>
-          <p class="projets-mobile-card-meta">${projectDateText(p)}</p>
+        <button type="button" class="all-projects-card" data-index="${i}">
+          <div class="all-projects-card-media"${cover ? ` style="background-image:url('${cover}')"` : ""}></div>
+          <p class="all-projects-card-title">${projectTitle(p)}</p>
+          <p class="all-projects-card-meta">${projectDateText(p)}</p>
         </button>`;
       })
       .join("");
@@ -1601,6 +1839,7 @@
     initReelKeyboard();
     startReelAuto();
     initFicheModal();
+    initAllProjectsOverlay();
     initScrollReveals();
     initResizeHandling();
     initHeroNameBounce();
