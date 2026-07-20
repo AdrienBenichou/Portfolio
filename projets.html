@@ -96,6 +96,16 @@
           </div>
           <p class="orbit-hint" data-i18n="projets.orbitHint">Clique un projet pour l'ouvrir en plein écran</p>
         </div>
+
+        <!-- ===== Grille filtrable "Tous mes projets" (remplace l'orbite sur mobile) ===== -->
+        <div class="projets-mobile-grid-wrap" id="projets-mobile-grid-wrap">
+          <div class="projets-mobile-filterbar" id="projets-mobile-filterbar">
+            <!-- groupes de filtres injectés par main.js -->
+          </div>
+          <div class="projets-mobile-grid" id="projets-mobile-grid">
+            <!-- cartes injectées par main.js -->
+          </div>
+        </div>
       </div>
     </section>
 
@@ -122,7 +132,7 @@
           <div class="projet-modal-body">
             <p id="projet-modal-entreprise" class="projet-modal-entreprise"></p>
             <h3 id="projet-modal-title" class="projet-modal-title"></h3>
-            <p id="projet-modal-dates" class="projet-modal-dates"></p>
+            <div id="projet-modal-dates" class="projet-modal-date-row"></div>
             <p id="projet-modal-description" class="projet-modal-description"></p>
             <ul id="projet-modal-skills" class="projet-modal-skills" aria-label="Compétences mobilisées"></ul>
           </div>

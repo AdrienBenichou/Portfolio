@@ -16,20 +16,57 @@
     resizeRAF: null,
   };
 
-  /* ============ NAVIGATION PRINCIPALE (cylindre de la page d'accueil) ============ */
+  /* ============ NAVIGATION PRINCIPALE (hero scoreboard de la page d'accueil) ============ */
   const NAV_SECTIONS = [
-    { labelKey: "nav.apropos", href: "apropos.html", tint: "#1B4FDB" },
-    { labelKey: "nav.projets", href: "projets.html", tint: "#FF6B35" },
-    { labelKey: "nav.softwares", href: "softwares.html", tint: "#0E7C86" },
-    { labelKey: "nav.diplomes", href: "diplomes.html", tint: "#12379E" },
-    { labelKey: "nav.benevolat", href: "benevolat.html", tint: "#E91E8C" },
+    { id: "apropos", labelKey: "nav.apropos", href: "apropos.html", tint: "#1B4FDB" },
+    { id: "projets", labelKey: "nav.projets", href: "projets.html", tint: "#FF6B35" },
+    { id: "softwares", labelKey: "nav.softwares", href: "softwares.html", tint: "#0E7C86" },
+    { id: "diplomes", labelKey: "nav.diplomes", href: "diplomes.html", tint: "#12379E" },
+    { id: "benevolat", labelKey: "nav.benevolat", href: "benevolat.html", tint: "#E91E8C" },
   ];
+
+  // Couleur + emoji par compétence : hash déterministe, mêmes teintes que le design handoff,
+  // pour que deux compétences identiques (hero, modal, softwares...) restent reconnaissables.
+  const COMPETENCE_EMOJI = {
+    "Vente": "💰",
+    "Relation client": "👥",
+    "Communication": "📱",
+    "Création de contenu": "🤳",
+    "Evenementiel": "🎉",
+    "Sport": "⚽",
+    "Data": "📈",
+    "Gamification": "🎮",
+  };
+  const COMPETENCE_PALETTE = ["#FF6B6B", "#FFA94D", "#FFD43B", "#69DB7C", "#38D9A9", "#4DABF7", "#748FFC", "#DA77F2", "#F783AC", "#94D82D"];
+  const FALLBACK_EMOJI_PALETTE = ["💡", "🔧", "🎯", "📌", "⭐", "🔥"];
+
+  function hashString(name) {
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+    return hash;
+  }
+  function emojiForCompetence(name) {
+    if (COMPETENCE_EMOJI[name]) return COMPETENCE_EMOJI[name];
+    return FALLBACK_EMOJI_PALETTE[hashString(name) % FALLBACK_EMOJI_PALETTE.length];
+  }
+  function colorForCompetence(name) {
+    return COMPETENCE_PALETTE[hashString(name) % COMPETENCE_PALETTE.length];
+  }
+
+  // Index ouvert au chargement via un lien profond (?open=2) depuis la pile du hero.
+  function getOpenParamIndex() {
+    const raw = new URLSearchParams(window.location.search).get("open");
+    if (raw === null) return null;
+    const n = parseInt(raw, 10);
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  }
 
   /* ============ TRADUCTIONS (labels d'interface uniquement) ============ */
   const I18N = {
     fr: {
       "hero.eyebrow": "Sport × Digital",
       "hero.tagline": "Je fais rimer performance sportive et stratégie digitale.",
+      "hero.allProjects": "Tous mes projets →",
       "nav.apropos": "À propos de moi",
       "nav.projets": "Mes projets",
       "nav.softwares": "Softwares",
@@ -64,6 +101,7 @@
     en: {
       "hero.eyebrow": "Sport × Digital",
       "hero.tagline": "Where athletic performance meets digital strategy.",
+      "hero.allProjects": "All my projects →",
       "nav.apropos": "About me",
       "nav.projets": "My projects",
       "nav.softwares": "Softwares",
@@ -138,14 +176,11 @@
     document.addEventListener("mouseover", (e) => {
       if (hero && hero.contains(e.target)) cursor.classList.add("is-dark");
 
-      const orbitNode = e.target.closest(".orbit-node");
-      const reelSlide = e.target.closest(".reel-slide");
-      const interactive = e.target.closest("a, button, .software-item, .orbit-node, .reel-slide");
+      const previewNode = e.target.closest(".orbit-node, .reel-slide, .hero-stack-card");
+      const interactive = e.target.closest("a, button, .software-item, .orbit-node, .reel-slide, .hero-stack-card");
 
       if (interactive) cursor.classList.add("is-hover");
-      // Le cylindre de nav (accueil) reste muet : seul le showcase projets affiche un label au survol.
-      const isNav = reelSlide && reelSlide.classList.contains("reel-slide--nav");
-      if (orbitNode || (reelSlide && !isNav)) {
+      if (previewNode) {
         cursor.classList.add("is-label");
         cursor.setAttribute("data-cursor-label", "VOIR");
       }
@@ -155,7 +190,7 @@
       if (hero && hero.contains(e.target) && !hero.contains(e.relatedTarget)) {
         cursor.classList.remove("is-dark");
       }
-      const interactive = e.target.closest("a, button, .software-item, .orbit-node, .reel-slide");
+      const interactive = e.target.closest("a, button, .software-item, .orbit-node, .reel-slide, .hero-stack-card");
       if (interactive && !interactive.contains(e.relatedTarget)) {
         cursor.classList.remove("is-hover");
         cursor.classList.remove("is-label");
@@ -164,11 +199,10 @@
     });
   }
 
-  /* ============ BANDEAU-CYLINDRE ROTATIF (nav d'accueil ou showcase projets) ============ */
+  /* ============ BANDEAU-CYLINDRE ROTATIF (showcase projets, page "Mes projets") ============ */
   const REEL_TINTS = ["#1B4FDB", "#FF6B35", "#E91E8C", "#12379E", "#0E7C86"];
   const REEL_AUTO_MS = 3400;
   const reelState = {
-    mode: "projects", // "nav" (accueil, redirige vers une page) ou "projects" (showcase projets)
     items: [],
     position: 0,
     stepPx: 0,
@@ -216,23 +250,14 @@
     const thumb = document.getElementById("reel-thumb-img");
     const thumbWrap = thumb && thumb.closest(".reel-pill-thumb");
 
-    if (reelState.mode === "nav") {
-      if (label) label.textContent = I18N[state.lang][item.labelKey];
-      if (thumb) thumb.src = "";
-      if (thumbWrap) {
-        thumbWrap.classList.add("is-tint");
-        thumbWrap.style.background = item.tint;
-      }
-    } else {
-      if (label) label.textContent = projectTitle(item);
-      if (thumb) {
-        thumb.src = projectCover(item);
-        thumb.alt = projectTitle(item);
-      }
-      if (thumbWrap) {
-        thumbWrap.classList.remove("is-tint");
-        thumbWrap.style.background = "";
-      }
+    if (label) label.textContent = projectTitle(item);
+    if (thumb) {
+      thumb.src = projectCover(item);
+      thumb.alt = projectTitle(item);
+    }
+    if (thumbWrap) {
+      thumbWrap.classList.remove("is-tint");
+      thumbWrap.style.background = "";
     }
   }
 
@@ -257,12 +282,7 @@
   }
 
   function activateReelSlide(index) {
-    if (reelState.mode === "nav") {
-      const section = NAV_SECTIONS[index];
-      if (section) navigateToPage(section.href);
-    } else {
-      openReelProject(index);
-    }
+    openReelProject(index);
   }
 
   function openReelProject(index) {
@@ -281,37 +301,12 @@
     const track = document.getElementById("reel-track");
     if (!track) return;
     const wrapper = document.getElementById("reel-wrapper");
-    reelState.mode = wrapper && wrapper.getAttribute("data-reel-mode") === "nav" ? "nav" : "projects";
-
-    if (reelState.mode === "nav") {
-      buildNavReelSlides(track);
-    } else {
-      buildProjectReelSlides(track);
-    }
+    buildProjectReelSlides(track);
 
     // Mise en scène d'entrée : le cylindre apparaît (fade + léger scale) une fois ses slides prêtes.
     if (wrapper && !wrapper.classList.contains("is-ready")) {
       requestAnimationFrame(() => requestAnimationFrame(() => wrapper.classList.add("is-ready")));
     }
-  }
-
-  function buildNavReelSlides(track) {
-    reelState.items = NAV_SECTIONS;
-    const n = NAV_SECTIONS.length;
-    const doubled = [...NAV_SECTIONS, ...NAV_SECTIONS];
-    track.innerHTML = doubled
-      .map((section, i) => {
-        const idx = i % n;
-        return `
-        <div class="reel-slide reel-slide--nav" data-index="${idx}" style="--slide-tint:${section.tint}">
-          <p class="reel-slide-title reel-slide-title--nav" data-i18n="${section.labelKey}">${I18N[state.lang][section.labelKey]}</p>
-        </div>`;
-      })
-      .join("");
-
-    reelState.position = 0;
-    measureReelStep();
-    updateReelLabelFromPosition();
   }
 
   function buildProjectReelSlides(track) {
@@ -460,6 +455,338 @@
     window.setTimeout(() => {
       window.location.href = href;
     }, 260);
+  }
+
+  /* ============ HERO D'ACCUEIL — carte scoreboard (liste de nav + pile de preview) ============ */
+  function getMoiProfile() {
+    if (!state.data) return [];
+    const moi = (state.data.moi && state.data.moi[0]) || null;
+    if (!moi) return [];
+    const photo = Array.isArray(moi["Photo"]) && moi["Photo"][0] ? moi["Photo"][0].url : "";
+    const subtitle = [moi["Age"] ? `${moi["Age"]} ans` : "", moi["Lieu"] || ""].filter(Boolean).join(" · ");
+    return [{ title: moi["Nom"] || "Adrien Benichou", subtitle, coverUrl: photo, index: null }];
+  }
+
+  function getSoftwaresSorted() {
+    if (!state.data) return [];
+    return [...(state.data.softwares || [])].sort((a, b) => (a["Rang"] || 0) - (b["Rang"] || 0));
+  }
+  function softwareLogo(sw) {
+    const logo = sw["Logo"];
+    return Array.isArray(logo) && logo[0] ? logo[0].url : "";
+  }
+
+  function getDiplomesSorted() {
+    if (!state.data) return [];
+    return [...(state.data.diplomes || [])].sort((a, b) => {
+      const dateA = new Date(a["Date"] || a["Date pas texte"] || 0);
+      const dateB = new Date(b["Date"] || b["Date pas texte"] || 0);
+      return dateA - dateB;
+    });
+  }
+
+  function getBenevolatList() {
+    if (!state.data) return [];
+    return state.data.benevolat || [];
+  }
+
+  // Cartes de la pile du hero, normalisées par section — même ordre que celui utilisé
+  // pour construire les data-hero-index de chaque page de section (deep-link ?open=).
+  function getHeroItemsFor(sectionId) {
+    if (sectionId === "apropos") return getMoiProfile();
+    if (sectionId === "projets") {
+      return getAllProjects().map((p, i) => ({ title: projectTitle(p), subtitle: projectByline(p), coverUrl: projectCover(p), index: i }));
+    }
+    if (sectionId === "softwares") {
+      return getSoftwaresSorted().map((sw, i) => ({ title: sw["Logiciel"] || "", subtitle: sw["Type"] || "", coverUrl: softwareLogo(sw), index: i }));
+    }
+    if (sectionId === "diplomes") {
+      return getDiplomesSorted().map((d, i) => ({ title: d["Nom"] || "", subtitle: d["Etablissement"] || "", coverUrl: "", index: i }));
+    }
+    if (sectionId === "benevolat") {
+      return getBenevolatList().map((b, i) => ({ title: b["Mission"] || "", subtitle: b["Etiquette"] || "", coverUrl: "", index: i }));
+    }
+    return [];
+  }
+
+  function heroCardHref(section, item) {
+    return item.index == null ? section.href : `${section.href}?open=${item.index}`;
+  }
+
+  const HERO_AUTO_DRIFT_RATE = 0.00045; // px de cycle / ms — même rythme que le design handoff
+
+  const heroState = {
+    sectionIndex: 0,
+    items: [],
+    pos: 0,
+    stepPx: 90,
+    dragging: false,
+    navButtons: [],
+    slots: [],
+  };
+
+  function isCompactHeroNav() {
+    return window.matchMedia("(max-width: 860px)").matches;
+  }
+
+  function initHomeHero() {
+    const navEl = document.getElementById("hero-nav");
+    const stackEl = document.getElementById("hero-stack");
+    const stackWrap = document.getElementById("hero-stack-wrap");
+    if (!navEl || !stackEl || !stackWrap) return; // page sans hero (sous-pages)
+
+    navEl.insertAdjacentHTML(
+      "beforeend",
+      NAV_SECTIONS.map(
+        (section, i) => `
+      <button type="button" class="hero-nav-item" data-index="${i}" style="--tint:${section.tint}">
+        <span class="hero-nav-item-dot"></span>
+        <p class="hero-nav-item-label" data-i18n="${section.labelKey}">${I18N[state.lang][section.labelKey]}</p>
+      </button>`
+      ).join("")
+    );
+    heroState.navButtons = Array.from(navEl.querySelectorAll(".hero-nav-item"));
+
+    heroState.slots = Array.from({ length: 6 }).map(() => {
+      const card = document.createElement("div");
+      card.className = "hero-stack-card";
+      card.style.display = "none";
+      card.innerHTML = `
+        <div class="hero-stack-card-media">
+          <span class="hero-stack-card-media-dot"></span>
+          <span class="hero-stack-card-media-line1"></span>
+          <span class="hero-stack-card-media-line2"></span>
+        </div>
+        <div class="hero-stack-card-footer">
+          <div>
+            <p class="hero-stack-card-title"></p>
+            <p class="hero-stack-card-subtitle"></p>
+          </div>
+        </div>`;
+      card.addEventListener("click", () => activateHeroCard(card));
+      stackEl.appendChild(card);
+      return card;
+    });
+
+    heroState.navButtons.forEach((btn, i) => {
+      btn.addEventListener("mouseenter", () => {
+        if (!isCompactHeroNav()) setHeroSection(i);
+      });
+      btn.addEventListener("click", () => {
+        setHeroSection(i);
+        if (!isCompactHeroNav()) navigateToPage(NAV_SECTIONS[i].href);
+      });
+    });
+    navEl.addEventListener("keydown", (e) => {
+      const n = NAV_SECTIONS.length;
+      if (e.key === "ArrowDown" || e.key === "ArrowRight") {
+        e.preventDefault();
+        setHeroSection((heroState.sectionIndex + 1) % n);
+      } else if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
+        e.preventDefault();
+        setHeroSection((heroState.sectionIndex - 1 + n) % n);
+      } else if (e.key === "Enter") {
+        navigateToPage(NAV_SECTIONS[heroState.sectionIndex].href);
+      }
+    });
+
+    initHeroNavDrag(navEl);
+    initHeroStackDrag(stackWrap);
+
+    stackWrap.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        heroState.pos = Math.round(heroState.pos) - 1;
+        renderHeroStack();
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        heroState.pos = Math.round(heroState.pos) + 1;
+        renderHeroStack();
+      }
+    });
+
+    window.addEventListener("resize", () => {
+      measureHeroNavBubble();
+      measureHeroStackStep();
+    });
+
+    const cta = document.getElementById("hero-all-cta");
+    if (cta) {
+      cta.addEventListener("click", (e) => {
+        e.preventDefault();
+        navigateToPage(cta.getAttribute("href"));
+      });
+    }
+
+    setHeroSection(0);
+    startHeroAutoDrift();
+  }
+
+  function setHeroSection(index) {
+    heroState.sectionIndex = index;
+    heroState.pos = 0;
+    heroState.items = getHeroItemsFor(NAV_SECTIONS[index].id);
+    heroState.navButtons.forEach((btn, i) => btn.classList.toggle("is-active", i === index));
+    measureHeroNavBubble();
+    renderHeroStack();
+    measureHeroStackStep();
+  }
+
+  function measureHeroNavBubble() {
+    const bubble = document.getElementById("hero-nav-bubble");
+    const navEl = document.getElementById("hero-nav");
+    const btn = heroState.navButtons[heroState.sectionIndex];
+    if (!bubble || !btn || !navEl) return;
+    bubble.style.left = `${btn.offsetLeft}px`;
+    bubble.style.width = `${btn.offsetWidth}px`;
+    const btnRight = btn.offsetLeft + btn.offsetWidth;
+    if (btn.offsetLeft < navEl.scrollLeft) navEl.scrollLeft = Math.max(0, btn.offsetLeft - 6);
+    else if (btnRight > navEl.scrollLeft + navEl.clientWidth) navEl.scrollLeft = btnRight - navEl.clientWidth + 6;
+  }
+
+  function measureHeroStackStep() {
+    const card = heroState.slots[0];
+    if (!card) return;
+    const h = card.getBoundingClientRect().height || card.offsetHeight;
+    if (h) heroState.stepPx = h * 0.237;
+    renderHeroStack();
+  }
+
+  // Empile les cartes de preview verticalement autour de la position de cycle courante
+  // (formule identique au design handoff : profondeur = décalage à l'entier de la position).
+  function renderHeroStack() {
+    const items = heroState.items;
+    const total = items.length;
+    const section = NAV_SECTIONS[heroState.sectionIndex];
+
+    if (!total) {
+      heroState.slots.forEach((card) => { card.style.display = "none"; });
+      return;
+    }
+
+    if (total <= 1) {
+      heroState.slots.forEach((card, i) => {
+        if (i > 0) { card.style.display = "none"; return; }
+        card.style.display = "flex";
+        applyHeroCardContent(card, items[0], section);
+        card.style.transform = "translate(-50%, -50%)";
+        card.style.opacity = "1";
+        card.style.zIndex = "10";
+      });
+      return;
+    }
+
+    const pos = heroState.pos;
+    const base = Math.floor(pos) - 2;
+    heroState.slots.forEach((card, i) => {
+      const k = base + i;
+      const itemIndex = ((k % total) + total) % total;
+      const depth = k - pos;
+      const ty = -depth * heroState.stepPx;
+      const scale = Math.max(0.55, 1 - Math.abs(depth) * 0.14);
+      const opacity = Math.abs(depth) < 0.15 ? 1 : Math.max(0, 1 - (Math.abs(depth) - 0.15) * 0.42);
+      const zIndex = 100 - Math.round(Math.abs(depth) * 10);
+      card.style.display = "flex";
+      applyHeroCardContent(card, items[itemIndex], section);
+      card.style.transform = `translate(-50%, -50%) translate(0px, ${ty.toFixed(1)}px) scale(${scale.toFixed(3)})`;
+      card.style.opacity = String(opacity);
+      card.style.zIndex = String(zIndex);
+    });
+  }
+
+  function applyHeroCardContent(card, item, section) {
+    card._href = heroCardHref(section, item);
+    const cacheKey = item.title + "|" + item.coverUrl + "|" + item.subtitle;
+    if (card.dataset.cachedKey === cacheKey) return;
+    card.dataset.cachedKey = cacheKey;
+    card.style.setProperty("--tint", section.tint);
+    card.classList.toggle("has-cover", !!item.coverUrl);
+    card.querySelector(".hero-stack-card-media").style.backgroundImage = item.coverUrl ? `url("${item.coverUrl}")` : "none";
+    card.querySelector(".hero-stack-card-title").textContent = item.title;
+    card.querySelector(".hero-stack-card-subtitle").textContent = item.subtitle || "";
+  }
+
+  function activateHeroCard(card) {
+    if (card._href) navigateToPage(card._href);
+  }
+
+  function initHeroStackDrag(wrap) {
+    let startY = 0;
+    let startPos = 0;
+    let moved = false;
+    wrap.addEventListener("pointerdown", (e) => {
+      if (e.button !== undefined && e.button !== 0) return;
+      startY = e.clientY;
+      startPos = heroState.pos;
+      moved = false;
+      heroState.dragging = true;
+      wrap.classList.add("is-dragging");
+      try { wrap.setPointerCapture(e.pointerId); } catch (err) {}
+    });
+    wrap.addEventListener("pointermove", (e) => {
+      if (!heroState.dragging || heroState.items.length <= 1) return;
+      const dy = e.clientY - startY;
+      if (Math.abs(dy) > 4) moved = true;
+      heroState.pos = startPos + dy / heroState.stepPx;
+      renderHeroStack();
+    });
+    const end = () => {
+      if (!heroState.dragging) return;
+      heroState.dragging = false;
+      wrap.classList.remove("is-dragging");
+      if (heroState.items.length > 1) {
+        heroState.pos = Math.round(heroState.pos);
+        renderHeroStack();
+      }
+      if (moved) {
+        // un vrai drag a eu lieu — on avale le click qui suit pour ne pas déclencher une navigation
+        const suppressClick = (ce) => { ce.stopPropagation(); ce.preventDefault(); };
+        document.addEventListener("click", suppressClick, { capture: true, once: true });
+      }
+    };
+    wrap.addEventListener("pointerup", end);
+    wrap.addEventListener("pointercancel", end);
+  }
+
+  function initHeroNavDrag(navEl) {
+    navEl.addEventListener("pointerdown", (e) => {
+      if (e.pointerType && e.pointerType !== "mouse") return; // tactile : défilement natif (touch-action: pan-x)
+      if (!isCompactHeroNav()) return;
+      const startX = e.clientX;
+      const startScroll = navEl.scrollLeft;
+      let moved = false;
+      const onMove = (ev) => {
+        const dx = ev.clientX - startX;
+        if (Math.abs(dx) > 4) moved = true;
+        navEl.scrollLeft = startScroll - dx;
+      };
+      const onUp = () => {
+        document.removeEventListener("pointermove", onMove);
+        document.removeEventListener("pointerup", onUp);
+        document.removeEventListener("pointercancel", onUp);
+        if (moved) {
+          const suppressClick = (ce) => { ce.stopPropagation(); ce.preventDefault(); };
+          document.addEventListener("click", suppressClick, { capture: true, once: true });
+        }
+      };
+      document.addEventListener("pointermove", onMove);
+      document.addEventListener("pointerup", onUp);
+      document.addEventListener("pointercancel", onUp);
+    });
+  }
+
+  function startHeroAutoDrift() {
+    let prevTs = null;
+    function tick(ts) {
+      requestAnimationFrame(tick);
+      if (prevTs == null) prevTs = ts;
+      const dt = Math.min(ts - prevTs, 100);
+      prevTs = ts;
+      if (heroState.dragging || heroState.items.length <= 1) return;
+      heroState.pos += HERO_AUTO_DRIFT_RATE * dt;
+      renderHeroStack();
+    }
+    requestAnimationFrame(tick);
   }
 
   /* ============ CHARGEMENT DES DONNÉES ============ */
@@ -613,6 +940,15 @@
 
     renderOrbit();
     buildReelSlides();
+    initProjetsAllGrid();
+
+    // Lien profond depuis une carte de la pile du hero (?open=<index>) : ouvre directement
+    // la fiche du projet correspondant, avec la même animation "shared element" qu'un clic.
+    const openIndex = getOpenParamIndex();
+    if (openIndex != null && orbitState.projects[openIndex]) {
+      const node = document.querySelector(`.orbit-node[data-index="${openIndex}"]`);
+      openProjectModal(openIndex, node);
+    }
 
     document.querySelectorAll(".filter-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -672,6 +1008,125 @@
     if (projects.length) showOrbitPreview(0);
   }
 
+  // Grille filtrable "Tous mes projets" — remplace l'orbite en dessous de 720px (voir CSS).
+  // Filtres multi-sélection par Type / Compétence / Organisation, à partir des champs
+  // Airtable réels (Date text, Compétences, Entreprise/Etude) déjà utilisés par l'orbite.
+  const projetsAllGridState = { filterType: [], filterComp: [], filterOrg: [], openGroup: null };
+
+  function openProjectFromCard(index, originEl) {
+    if (state.activeFilter !== "all") {
+      state.activeFilter = "all";
+      document.querySelectorAll(".filter-btn").forEach((b) => {
+        b.classList.toggle("is-active", b.getAttribute("data-filter") === "all");
+      });
+      renderOrbit();
+    }
+    openProjectModal(index, originEl);
+  }
+
+  function initProjetsAllGrid() {
+    const filterBar = document.getElementById("projets-mobile-filterbar");
+    const grid = document.getElementById("projets-mobile-grid");
+    if (!filterBar || !grid) return; // page sans grille mobile
+
+    filterBar.addEventListener("click", (e) => {
+      const groupBtn = e.target.closest(".projets-mobile-filter-btn");
+      const chip = e.target.closest(".projets-mobile-filter-chip");
+      const reset = e.target.closest(".projets-mobile-reset");
+      if (groupBtn) {
+        const key = groupBtn.getAttribute("data-group");
+        projetsAllGridState.openGroup = projetsAllGridState.openGroup === key ? null : key;
+        renderProjetsAllGrid();
+      } else if (chip) {
+        const key = chip.getAttribute("data-group");
+        const value = chip.getAttribute("data-value");
+        const list = projetsAllGridState[key];
+        const idx = list.indexOf(value);
+        if (idx === -1) list.push(value);
+        else list.splice(idx, 1);
+        renderProjetsAllGrid();
+      } else if (reset) {
+        projetsAllGridState.filterType = [];
+        projetsAllGridState.filterComp = [];
+        projetsAllGridState.filterOrg = [];
+        projetsAllGridState.openGroup = null;
+        renderProjetsAllGrid();
+      }
+    });
+
+    grid.addEventListener("click", (e) => {
+      const card = e.target.closest(".projets-mobile-card");
+      if (!card) return;
+      openProjectFromCard(parseInt(card.getAttribute("data-index"), 10), card);
+    });
+
+    document.addEventListener("click", (e) => {
+      if (!projetsAllGridState.openGroup) return;
+      if (!e.target.closest(".projets-mobile-filter-group")) {
+        projetsAllGridState.openGroup = null;
+        renderProjetsAllGrid();
+      }
+    });
+
+    renderProjetsAllGrid();
+  }
+
+  function renderProjetsAllGrid() {
+    const filterBar = document.getElementById("projets-mobile-filterbar");
+    const grid = document.getElementById("projets-mobile-grid");
+    if (!filterBar || !grid) return;
+
+    const all = getAllProjects();
+    const s = projetsAllGridState;
+    const groups = [
+      { key: "filterType", title: "Type", values: Array.from(new Set(all.map(projectDateText).filter(Boolean))) },
+      { key: "filterComp", title: "Compétence", values: Array.from(new Set(all.flatMap((p) => p["Compétences"] || []))) },
+      { key: "filterOrg", title: "Organisation", values: Array.from(new Set(all.map(projectByline).filter(Boolean))) },
+    ];
+    const activeCount = s.filterType.length + s.filterComp.length + s.filterOrg.length;
+
+    filterBar.innerHTML =
+      groups
+        .map((g) => {
+          const active = s[g.key];
+          const isOpen = s.openGroup === g.key;
+          return `
+        <div class="projets-mobile-filter-group">
+          <button type="button" class="projets-mobile-filter-btn${active.length ? " is-active" : ""}" data-group="${g.key}">
+            ${g.title}${active.length ? ` (${active.length})` : ""} <span class="projets-mobile-filter-chevron">▾</span>
+          </button>
+          ${
+            isOpen
+              ? `<div class="projets-mobile-filter-menu">${g.values
+                  .map(
+                    (v) => `<button type="button" class="projets-mobile-filter-chip${active.includes(v) ? " is-active" : ""}" data-group="${g.key}" data-value="${v}">${v}</button>`
+                  )
+                  .join("")}</div>`
+              : ""
+          }
+        </div>`;
+        })
+        .join("") + (activeCount ? `<button type="button" class="projets-mobile-reset">Réinitialiser</button>` : "");
+
+    const filtered = all
+      .map((p, i) => ({ p, i }))
+      .filter(({ p }) => !s.filterType.length || s.filterType.includes(projectDateText(p)))
+      .filter(({ p }) => !s.filterOrg.length || s.filterOrg.includes(projectByline(p)))
+      .filter(({ p }) => !s.filterComp.length || (p["Compétences"] || []).some((c) => s.filterComp.includes(c)));
+
+    grid.innerHTML = filtered
+      .map(({ p, i }) => {
+        const cover = projectCover(p);
+        return `
+        <button type="button" class="projets-mobile-card" data-index="${i}">
+          <div class="projets-mobile-card-media"${cover ? ` style="background-image:url('${cover}')"` : ""}></div>
+          <p class="projets-mobile-card-title">${projectTitle(p)}</p>
+          <p class="projets-mobile-card-meta">${projectDateText(p)}</p>
+        </button>`;
+      })
+      .join("");
+  }
+
   function applyOrbitLayout() {
     const radius = getOrbitRadius();
     document.querySelectorAll(".orbit-node").forEach((node) => {
@@ -727,17 +1182,36 @@
     };
   }
 
+  // Formatte la date ISO ("2023-06-01") en repère lisible ("juin 2023") ; les tables sans
+  // date exacte (académique) n'ont que "Date text" et laissent ce chip de côté.
+  function formatProjectDate(p) {
+    const raw = p["Date"];
+    if (!raw) return "";
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toLocaleDateString(state.lang === "en" ? "en-US" : "fr-FR", { month: "short", year: "numeric" });
+  }
+
   function fillModalContent(project, index) {
     const els = getModalEls();
     els.img.src = projectCover(project);
     els.img.alt = projectTitle(project);
     els.title.textContent = projectTitle(project);
     els.entreprise.textContent = projectByline(project);
-    els.dates.textContent = projectDateText(project);
     els.description.textContent = project["Description"] || "";
 
+    const dateChips = [projectDateText(project), formatProjectDate(project)].filter(Boolean);
+    els.dates.innerHTML = dateChips.map((d) => `<span class="projet-modal-date-chip">${d}</span>`).join("");
+
     const skills = project["Compétences"];
-    els.skills.innerHTML = Array.isArray(skills) ? skills.map((s) => `<li>${s}</li>`).join("") : "";
+    els.skills.innerHTML = Array.isArray(skills)
+      ? skills
+          .map((s) => {
+            const color = colorForCompetence(s);
+            return `<li style="background:${color}1c; border:1px solid ${color}40; color:${color};">${emojiForCompetence(s)} ${s}</li>`;
+          })
+          .join("")
+      : "";
 
     els.indexCurrent.textContent = index + 1;
     els.indexTotal.textContent = orbitState.projects.length;
@@ -893,12 +1367,12 @@
     const grid = document.getElementById("softwares-grid");
     if (!grid) return; // page sans section Softwares
 
-    const softwares = [...(state.data.softwares || [])].sort((a, b) => (a["Rang"] || 0) - (b["Rang"] || 0));
+    const softwares = getSoftwaresSorted();
     const grouped = {};
-    softwares.forEach((sw) => {
+    softwares.forEach((sw, i) => {
       const type = sw["Type"] || "Autres";
       if (!grouped[type]) grouped[type] = [];
-      grouped[type].push(sw);
+      grouped[type].push({ ...sw, _heroIndex: i });
     });
 
     grid.innerHTML = Object.entries(grouped)
@@ -908,14 +1382,15 @@
         ${items
           .map(
             (sw) => `
-          <div class="software-item">
-            <img src="${sw["Logo"] && sw["Logo"][0] ? sw["Logo"][0].url : ""}" alt="${sw["Logiciel"]}">
+          <div class="software-item" data-hero-index="${sw._heroIndex}">
+            <img src="${softwareLogo(sw)}" alt="${sw["Logiciel"]}">
             <p class="software-item-name">${sw["Logiciel"]}</p>
           </div>`
           )
           .join("")}`
       )
       .join("");
+    applyDeepLinkHighlight();
   }
 
   /* ============ DIPLÔMES ============ */
@@ -923,22 +1398,19 @@
     const timelineEl = document.getElementById("diplomes-timeline");
     if (!timelineEl) return; // page sans section Diplômes
 
-    const diplomes = [...(state.data.diplomes || [])].sort((a, b) => {
-      const dateA = new Date(a["Date"] || a["Date pas texte"] || 0);
-      const dateB = new Date(b["Date"] || b["Date pas texte"] || 0);
-      return dateA - dateB;
-    });
+    const diplomes = getDiplomesSorted();
 
     timelineEl.innerHTML = diplomes
       .map(
-        (d) => `
-        <li class="timeline-item">
+        (d, i) => `
+        <li class="timeline-item" data-hero-index="${i}">
           <p class="timeline-date">${d["Date (texte)"] || ""}</p>
           <p class="timeline-title">${d["Nom"] || ""}</p>
           <p class="timeline-desc">${d["Etablissement"] || ""} — ${d["Description"] || ""}</p>
         </li>`
       )
       .join("");
+    applyDeepLinkHighlight();
   }
 
   /* ============ BÉNÉVOLAT ============ */
@@ -946,11 +1418,11 @@
     const grid = document.getElementById("benevolat-grid");
     if (!grid) return; // page sans section Bénévolat
 
-    const benevolat = state.data.benevolat || [];
+    const benevolat = getBenevolatList();
     grid.innerHTML = benevolat
       .map(
-        (b) => `
-        <div class="benevolat-card">
+        (b, i) => `
+        <div class="benevolat-card" data-hero-index="${i}">
           <span class="benevolat-card-tag">${b["Etiquette"] || ""}</span>
           <p class="benevolat-card-mission">${b["Mission"] || ""}</p>
           <p class="benevolat-card-meta">${b["Lieu"] || ""} · ${b["Date (texte)"] || b["Date"] || ""}</p>
@@ -958,6 +1430,22 @@
         </div>`
       )
       .join("");
+    applyDeepLinkHighlight();
+  }
+
+  // Lien profond depuis la pile du hero (?open=<index>) vers un élément déjà visible sur la
+  // page : ces pages n'ont pas de fiche cachée, donc on scrolle vers l'élément et on le surligne
+  // brièvement plutôt que d'inventer une modale sans contenu supplémentaire à montrer.
+  function applyDeepLinkHighlight() {
+    const idx = getOpenParamIndex();
+    if (idx == null) return;
+    const el = document.querySelector(`[data-hero-index="${idx}"]`);
+    if (!el) return;
+    requestAnimationFrame(() => {
+      el.scrollIntoView({ behavior: state.reducedMotion ? "auto" : "smooth", block: "center" });
+      el.classList.add("is-deep-link-target");
+      setTimeout(() => el.classList.remove("is-deep-link-target"), 1600);
+    });
   }
 
   /* ============ CONTACT ============ */
@@ -1137,10 +1625,11 @@
     initResizeHandling();
     initHeroNameBounce();
 
-    if (document.body.dataset.page === "home") {
-      buildReelSlides();
-    } else {
-      loadData().then(renderContact);
-    }
+    // Chaque page (y compris l'accueil) a besoin de data.json : le hero affiche désormais
+    // de vraies cartes de preview (projets/softwares/diplômes/bénévolat) dans sa pile.
+    loadData().then(() => {
+      initHomeHero();
+      renderContact();
+    });
   });
 })();

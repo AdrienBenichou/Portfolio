@@ -24,26 +24,31 @@
     <button type="button" class="lang-btn" data-lang-btn="en" aria-pressed="false">EN</button>
   </div>
 
-  <!-- ============ HERO : cercle-cylindre rotatif, seule navigation de la page d'accueil ============ -->
-  <header id="hero" class="hero hero--nav-only">
-    <p class="hero-bg-name" id="hero-bg-name" aria-hidden="true">Adrien Benichou</p>
+  <!-- ============ HERO : nom + liste de nav (score) + pile de projets, seule navigation de la page d'accueil ============ -->
+  <header id="hero" class="hero hero--split">
+    <div class="hero-card" id="hero-card">
+      <div class="hero-stickers" aria-hidden="true">
+        <img src="assets/sticker-monaco.png" alt="" class="hero-sticker hero-sticker--a" loading="lazy">
+        <img src="assets/sticker-cnosf.png" alt="" class="hero-sticker hero-sticker--b" loading="lazy">
+      </div>
 
-    <div class="reel-wrapper" id="reel-wrapper" data-reel-mode="nav">
-      <div class="reel" id="reel" tabindex="0" role="listbox" aria-label="Navigation principale">
-        <div class="reel-track" id="reel-track">
-          <!-- slides injectés par main.js depuis les 5 sections du site -->
+      <div class="hero-main">
+        <p class="hero-name" id="hero-bg-name">Adrien Benichou</p>
+        <p class="hero-eyebrow" data-i18n="hero.eyebrow">Sport × Digital</p>
+
+        <div class="hero-nav" id="hero-nav" role="group" aria-label="Navigation principale">
+          <div class="hero-nav-bubble" id="hero-nav-bubble" aria-hidden="true"></div>
+          <!-- boutons de section injectés par main.js -->
         </div>
       </div>
-      <div class="reel-controls">
-        <div class="reel-pill">
-          <div class="reel-pill-thumb"><img id="reel-thumb-img" src="" alt=""></div>
-          <p class="reel-pill-label" id="reel-label"></p>
-          <div class="reel-pill-arrows">
-            <button type="button" class="reel-arrow" id="reel-prev" aria-label="Section précédente">&larr;</button>
-            <button type="button" class="reel-arrow" id="reel-next" aria-label="Section suivante">&rarr;</button>
-          </div>
+
+      <div class="hero-stack-wrap" id="hero-stack-wrap" tabindex="0" role="group" aria-label="Aperçu de la section">
+        <div class="hero-stack" id="hero-stack">
+          <!-- cartes de preview injectées par main.js -->
         </div>
       </div>
+
+      <a href="projets.html" class="hero-all-cta" id="hero-all-cta" data-i18n="hero.allProjects">Tous mes projets →</a>
     </div>
   </header>
 
