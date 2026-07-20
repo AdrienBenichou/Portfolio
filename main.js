@@ -1,7 +1,8 @@
 /* ============================================
    main.js — Portfolio Adrien Benichou
-   Cylindre rotatif (nav d'accueil + showcase projets), orbite projets
-   + modal éditorial plein écran, données Airtable (data.json), i18n, filtre
+   Hero scoreboard (nav + pile de preview), orbite/bandeau projets,
+   fiche plein écran partagée (design Claude Design), données Airtable
+   (data.json), i18n, filtres
    ============================================ */
 
 (function () {
@@ -51,14 +52,6 @@
   }
   function colorForCompetence(name) {
     return COMPETENCE_PALETTE[hashString(name) % COMPETENCE_PALETTE.length];
-  }
-
-  // Index ouvert au chargement via un lien profond (?open=2) depuis la pile du hero.
-  function getOpenParamIndex() {
-    const raw = new URLSearchParams(window.location.search).get("open");
-    if (raw === null) return null;
-    const n = parseInt(raw, 10);
-    return Number.isFinite(n) && n >= 0 ? n : null;
   }
 
   /* ============ TRADUCTIONS (labels d'interface uniquement) ============ */
@@ -281,20 +274,16 @@
     window.setTimeout(wrapReelIfNeeded, 620);
   }
 
-  function activateReelSlide(index) {
-    openReelProject(index);
+  function activateReelSlide(index, originEl) {
+    const project = reelState.items[index];
+    if (project) openProjectFiche(project, originEl);
   }
 
-  function openReelProject(index) {
-    if (state.activeFilter !== "all") {
-      state.activeFilter = "all";
-      document.querySelectorAll(".filter-btn").forEach((b) => {
-        b.classList.toggle("is-active", b.getAttribute("data-filter") === "all");
-      });
-      renderOrbit();
-    }
-    const node = document.querySelector(`.orbit-node[data-index="${index}"]`);
-    if (node) openProjectModal(index, node);
+  // Ouvre la fiche d'un projet depuis n'importe quel point d'entrée (orbite, bandeau, grille
+  // filtrable mobile) — tint fixe de la section "Mes projets", indépendant du filtre actif.
+  function openProjectFiche(project, originEl) {
+    const tint = NAV_SECTIONS.find((s) => s.id === "projets").tint;
+    openFiche(buildProjectFiche(project, tint), originEl);
   }
 
   function buildReelSlides() {
@@ -368,7 +357,7 @@
       window.setTimeout(wrapReelIfNeeded, 620);
 
       if (Math.abs(reelState.dragMoved) <= 6 && reelState.pressedSlide) {
-        activateReelSlide(parseInt(reelState.pressedSlide.getAttribute("data-index"), 10));
+        activateReelSlide(parseInt(reelState.pressedSlide.getAttribute("data-index"), 10), reelState.pressedSlide);
       }
       reelState.pressedSlide = null;
     }
@@ -457,14 +446,22 @@
     }, 260);
   }
 
-  /* ============ HERO D'ACCUEIL — carte scoreboard (liste de nav + pile de preview) ============ */
+  /* ============ FICHE — modal détail plein écran (copie du composant Claude Design) ============ */
+  // Un item de fiche est un objet normalisé, identique quelle que soit la section d'origine
+  // (Airtable expose des colonnes différentes par table) — c'est ce qui alimente à la fois la
+  // pile du hero, les grilles/listes de chaque page, et la fiche elle-même.
   function getMoiProfile() {
     if (!state.data) return [];
     const moi = (state.data.moi && state.data.moi[0]) || null;
     if (!moi) return [];
     const photo = Array.isArray(moi["Photo"]) && moi["Photo"][0] ? moi["Photo"][0].url : "";
     const subtitle = [moi["Age"] ? `${moi["Age"]} ans` : "", moi["Lieu"] || ""].filter(Boolean).join(" · ");
-    return [{ title: moi["Nom"] || "Adrien Benichou", subtitle, coverUrl: photo, index: null }];
+    const competences = [
+      moi["Français"] ? `Français — ${moi["Français"]}` : "",
+      moi["Anglais"] ? `Anglais — ${moi["Anglais"]}` : "",
+      moi["Allemand"] ? `Allemand — ${moi["Allemand"]}` : "",
+    ].filter(Boolean);
+    return [{ title: moi["Nom"] || "Adrien Benichou", subtitle, coverUrl: photo, description: moi["Description"] || "", competences }];
   }
 
   function getSoftwaresSorted() {
@@ -490,27 +487,231 @@
     return state.data.benevolat || [];
   }
 
-  // Cartes de la pile du hero, normalisées par section — même ordre que celui utilisé
-  // pour construire les data-hero-index de chaque page de section (deep-link ?open=).
-  function getHeroItemsFor(sectionId) {
-    if (sectionId === "apropos") return getMoiProfile();
-    if (sectionId === "projets") {
-      return getAllProjects().map((p, i) => ({ title: projectTitle(p), subtitle: projectByline(p), coverUrl: projectCover(p), index: i }));
+  // Formatte la date ISO ("2023-06-01") en repère lisible ("juin 2023") ; les tables sans
+  // date exacte (académique) n'ont que "Date text" et laissent ce chip de côté.
+  function formatProjectDate(p) {
+    const raw = p["Date"];
+    if (!raw) return "";
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toLocaleDateString(state.lang === "en" ? "en-US" : "fr-FR", { month: "short", year: "numeric" });
+  }
+
+  function buildProjectFiche(p, tint) {
+    const kicker = projectByline(p);
+    return {
+      title: projectTitle(p),
+      kicker,
+      subtitle: kicker,
+      coverUrl: projectCover(p),
+      isProfile: false,
+      dateChips: [projectDateText(p), formatProjectDate(p)].filter(Boolean),
+      lieu: "",
+      competences: p["Compétences"] || [],
+      description: p["Description"] || "",
+      tint,
+    };
+  }
+
+  // Items de fiche normalisés pour une section — même source pour la pile du hero et pour
+  // les listes/grilles de chaque page (data-hero-index y référence cet ordre).
+  function getFicheItemsFor(sectionId) {
+    const section = NAV_SECTIONS.find((s) => s.id === sectionId);
+    const tint = section ? section.tint : "#1B4FDB";
+    if (sectionId === "apropos") {
+      return getMoiProfile().map((m) => ({
+        title: m.title,
+        kicker: "",
+        subtitle: m.subtitle,
+        coverUrl: m.coverUrl,
+        isProfile: true,
+        dateChips: m.subtitle ? [m.subtitle] : [],
+        lieu: "",
+        competences: m.competences,
+        description: m.description,
+        tint,
+      }));
     }
+    if (sectionId === "projets") return getAllProjects().map((p) => buildProjectFiche(p, tint));
     if (sectionId === "softwares") {
-      return getSoftwaresSorted().map((sw, i) => ({ title: sw["Logiciel"] || "", subtitle: sw["Type"] || "", coverUrl: softwareLogo(sw), index: i }));
+      return getSoftwaresSorted().map((sw) => ({
+        title: sw["Logiciel"] || "",
+        kicker: sw["Type"] || "",
+        subtitle: sw["Type"] || "",
+        coverUrl: softwareLogo(sw),
+        isProfile: false,
+        dateChips: [],
+        lieu: "",
+        competences: [],
+        description: "",
+        tint,
+      }));
     }
     if (sectionId === "diplomes") {
-      return getDiplomesSorted().map((d, i) => ({ title: d["Nom"] || "", subtitle: d["Etablissement"] || "", coverUrl: "", index: i }));
+      return getDiplomesSorted().map((d) => ({
+        title: d["Nom"] || "",
+        kicker: d["Etablissement"] || "",
+        subtitle: d["Etablissement"] || "",
+        coverUrl: "",
+        isProfile: false,
+        dateChips: [d["Date (texte)"]].filter(Boolean),
+        lieu: "",
+        competences: [],
+        description: d["Description"] || "",
+        tint,
+      }));
     }
     if (sectionId === "benevolat") {
-      return getBenevolatList().map((b, i) => ({ title: b["Mission"] || "", subtitle: b["Etiquette"] || "", coverUrl: "", index: i }));
+      return getBenevolatList().map((b) => ({
+        title: b["Mission"] || "",
+        kicker: b["Etiquette"] || "",
+        subtitle: b["Etiquette"] || "",
+        coverUrl: "",
+        isProfile: false,
+        dateChips: [b["Date (texte)"] || b["Date"]].filter(Boolean),
+        lieu: b["Lieu"] || "",
+        competences: [],
+        description: b["Description"] || "",
+        tint,
+      }));
     }
     return [];
   }
 
-  function heroCardHref(section, item) {
-    return item.index == null ? section.href : `${section.href}?open=${item.index}`;
+  // Modal "fiche" partagée par toutes les pages — injectée une fois dans le <body>, ouverte
+  // avec une transition FLIP (shared element) depuis la carte cliquée, comme dans le design.
+  function initFicheModal() {
+    if (document.getElementById("fiche-modal")) return;
+
+    const backdrop = document.createElement("div");
+    backdrop.id = "fiche-backdrop";
+    backdrop.className = "fiche-backdrop";
+    backdrop.hidden = true;
+    backdrop.addEventListener("click", closeFiche);
+
+    const modal = document.createElement("div");
+    modal.id = "fiche-modal";
+    modal.className = "fiche-modal";
+    modal.hidden = true;
+    modal.innerHTML = `
+      <button type="button" class="fiche-close-btn" aria-label="Fermer">✕</button>
+      <div class="fiche-cover"></div>
+      <div class="fiche-body">
+        <div class="fiche-header-row">
+          <div class="fiche-photo"></div>
+          <div class="fiche-header-text">
+            <p class="fiche-kicker"></p>
+            <p class="fiche-title"></p>
+          </div>
+        </div>
+        <div class="fiche-date-row"></div>
+        <div class="fiche-meta-row"></div>
+        <div class="fiche-competences-row"></div>
+        <div class="fiche-divider"></div>
+        <p class="fiche-description"></p>
+      </div>`;
+    modal.querySelector(".fiche-close-btn").addEventListener("click", closeFiche);
+
+    document.body.appendChild(backdrop);
+    document.body.appendChild(modal);
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeFiche();
+    });
+  }
+
+  function renderFicheContent(item) {
+    const modal = document.getElementById("fiche-modal");
+    if (!modal) return;
+
+    const cover = modal.querySelector(".fiche-cover");
+    cover.style.background = item.coverUrl ? `#1a1c22 url("${item.coverUrl}") center/cover no-repeat` : `linear-gradient(160deg, ${item.tint || "#1B4FDB"}, #0d0e12)`;
+
+    modal.querySelector(".fiche-header-row").classList.toggle("is-profile", !!item.isProfile);
+    const photo = modal.querySelector(".fiche-photo");
+    photo.style.display = item.isProfile ? "block" : "none";
+    photo.style.backgroundImage = item.isProfile && item.coverUrl ? `url("${item.coverUrl}")` : "none";
+
+    const kickerEl = modal.querySelector(".fiche-kicker");
+    kickerEl.textContent = item.kicker || "";
+    kickerEl.style.display = item.kicker ? "" : "none";
+
+    modal.querySelector(".fiche-title").textContent = item.title || "";
+
+    const dateRow = modal.querySelector(".fiche-date-row");
+    dateRow.innerHTML = (item.dateChips || []).map((d) => `<span class="fiche-date-chip">${d}</span>`).join("");
+    dateRow.style.display = (item.dateChips || []).length ? "flex" : "none";
+
+    const metaRow = modal.querySelector(".fiche-meta-row");
+    metaRow.innerHTML = item.lieu ? `<span class="fiche-meta-item">📍 ${item.lieu}</span>` : "";
+    metaRow.style.display = item.lieu ? "flex" : "none";
+
+    const compRow = modal.querySelector(".fiche-competences-row");
+    compRow.innerHTML = (item.competences || [])
+      .map((c) => {
+        const color = colorForCompetence(c);
+        return `<span class="fiche-chip" style="background:${color}1c; border:1px solid ${color}40; color:${color};">${emojiForCompetence(c)} ${c}</span>`;
+      })
+      .join("");
+    compRow.style.display = (item.competences || []).length ? "flex" : "none";
+
+    const desc = modal.querySelector(".fiche-description");
+    desc.textContent = item.description || "";
+    desc.style.display = item.description ? "block" : "none";
+  }
+
+  function openFiche(item, originEl) {
+    if (!item) return;
+    const modal = document.getElementById("fiche-modal");
+    const backdrop = document.getElementById("fiche-backdrop");
+    if (!modal || !backdrop) return;
+
+    renderFicheContent(item);
+
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const rect = originEl ? originEl.getBoundingClientRect() : null;
+    const fromTransform = rect
+      ? `translate(${rect.left}px, ${rect.top}px) scale(${(rect.width / vw).toFixed(4)}, ${(rect.height / vh).toFixed(4)})`
+      : `translate(${vw / 2 - 60}px, ${vh / 2 - 40}px) scale(0.02, 0.02)`;
+
+    modal._fromTransform = fromTransform;
+    document.body.style.overflow = "hidden";
+    modal.hidden = false;
+    backdrop.hidden = false;
+    modal.style.transition = "none";
+    backdrop.style.transition = "none";
+    modal.style.transform = fromTransform;
+    modal.style.borderRadius = "18px";
+    backdrop.style.opacity = "0";
+    // force reflow avant de relâcher la transition, sinon le navigateur regroupe les deux états
+    // eslint-disable-next-line no-unused-expressions
+    modal.offsetHeight;
+
+    requestAnimationFrame(() => {
+      modal.style.transition = "";
+      backdrop.style.transition = "";
+      modal.style.transform = "translate(0px, 0px) scale(1, 1)";
+      modal.style.borderRadius = "0px";
+      backdrop.style.opacity = "0.72";
+    });
+  }
+
+  function closeFiche() {
+    const modal = document.getElementById("fiche-modal");
+    const backdrop = document.getElementById("fiche-backdrop");
+    if (!modal || modal.hidden) return;
+
+    modal.style.transform = modal._fromTransform || "translate(0px, 0px) scale(1, 1)";
+    modal.style.borderRadius = "18px";
+    backdrop.style.opacity = "0";
+
+    clearTimeout(modal._closeTimer);
+    modal._closeTimer = setTimeout(() => {
+      modal.hidden = true;
+      backdrop.hidden = true;
+      document.body.style.overflow = "";
+    }, 620);
   }
 
   const HERO_AUTO_DRIFT_RATE = 0.00045; // px de cycle / ms — même rythme que le design handoff
@@ -625,7 +826,7 @@
   function setHeroSection(index) {
     heroState.sectionIndex = index;
     heroState.pos = 0;
-    heroState.items = getHeroItemsFor(NAV_SECTIONS[index].id);
+    heroState.items = getFicheItemsFor(NAV_SECTIONS[index].id);
     heroState.navButtons.forEach((btn, i) => btn.classList.toggle("is-active", i === index));
     measureHeroNavBubble();
     renderHeroStack();
@@ -695,7 +896,7 @@
   }
 
   function applyHeroCardContent(card, item, section) {
-    card._href = heroCardHref(section, item);
+    card._item = item;
     const cacheKey = item.title + "|" + item.coverUrl + "|" + item.subtitle;
     if (card.dataset.cachedKey === cacheKey) return;
     card.dataset.cachedKey = cacheKey;
@@ -707,7 +908,7 @@
   }
 
   function activateHeroCard(card) {
-    if (card._href) navigateToPage(card._href);
+    if (card._item) openFiche(card._item, card);
   }
 
   function initHeroStackDrag(wrap) {
@@ -845,14 +1046,17 @@
 
     timelineEl.innerHTML = experiences
       .map(
-        (exp) => `
-        <li class="timeline-item">
+        (exp, i) => `
+        <li class="timeline-item" data-hero-index="${i}">
           <p class="timeline-date">${projectDateText(exp)}</p>
           <p class="timeline-title">${projectTitle(exp)}</p>
           <p class="timeline-desc">${projectByline(exp)}</p>
         </li>`
       )
       .join("");
+    timelineEl.querySelectorAll(".timeline-item").forEach((el) => {
+      el.addEventListener("click", () => openProjectFiche(experiences[parseInt(el.getAttribute("data-hero-index"), 10)], el));
+    });
 
     // Compétences groupées (extraites des projets)
     const allSkills = new Set();
@@ -882,10 +1086,6 @@
   const orbitState = {
     projects: [],
     activeIndex: 0,
-  };
-  const modalState = {
-    isOpen: false,
-    originNode: null,
   };
 
   function getAllProjects() {
@@ -942,14 +1142,6 @@
     buildReelSlides();
     initProjetsAllGrid();
 
-    // Lien profond depuis une carte de la pile du hero (?open=<index>) : ouvre directement
-    // la fiche du projet correspondant, avec la même animation "shared element" qu'un clic.
-    const openIndex = getOpenParamIndex();
-    if (openIndex != null && orbitState.projects[openIndex]) {
-      const node = document.querySelector(`.orbit-node[data-index="${openIndex}"]`);
-      openProjectModal(openIndex, node);
-    }
-
     document.querySelectorAll(".filter-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
         document.querySelectorAll(".filter-btn").forEach((b) => b.classList.remove("is-active"));
@@ -996,11 +1188,11 @@
       node.addEventListener("focus", () => showOrbitPreview(i));
       node.addEventListener("mouseleave", () => showOrbitPreview(orbitState.activeIndex));
       node.addEventListener("blur", () => showOrbitPreview(orbitState.activeIndex));
-      node.addEventListener("click", () => openProjectModal(i, node));
+      node.addEventListener("click", () => openProjectFiche(projects[i], node));
       node.addEventListener("keydown", (e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          openProjectModal(i, node);
+          openProjectFiche(projects[i], node);
         }
       });
     });
@@ -1012,17 +1204,6 @@
   // Filtres multi-sélection par Type / Compétence / Organisation, à partir des champs
   // Airtable réels (Date text, Compétences, Entreprise/Etude) déjà utilisés par l'orbite.
   const projetsAllGridState = { filterType: [], filterComp: [], filterOrg: [], openGroup: null };
-
-  function openProjectFromCard(index, originEl) {
-    if (state.activeFilter !== "all") {
-      state.activeFilter = "all";
-      document.querySelectorAll(".filter-btn").forEach((b) => {
-        b.classList.toggle("is-active", b.getAttribute("data-filter") === "all");
-      });
-      renderOrbit();
-    }
-    openProjectModal(index, originEl);
-  }
 
   function initProjetsAllGrid() {
     const filterBar = document.getElementById("projets-mobile-filterbar");
@@ -1057,7 +1238,8 @@
     grid.addEventListener("click", (e) => {
       const card = e.target.closest(".projets-mobile-card");
       if (!card) return;
-      openProjectFromCard(parseInt(card.getAttribute("data-index"), 10), card);
+      const project = getAllProjects()[parseInt(card.getAttribute("data-index"), 10)];
+      if (project) openProjectFiche(project, card);
     });
 
     document.addEventListener("click", (e) => {
@@ -1163,226 +1345,28 @@
     document.querySelector(".orbit-center-text").classList.add("is-visible");
   }
 
-  /* ---- Modal éditorial plein écran (ouverture "shared element" depuis le nœud cliqué) ---- */
-  function getModalEls() {
-    return {
-      modal: document.getElementById("projet-modal"),
-      content: document.getElementById("projet-modal-content"),
-      scroll: document.getElementById("projet-modal-scroll"),
-      img: document.getElementById("projet-modal-img"),
-      entreprise: document.getElementById("projet-modal-entreprise"),
-      title: document.getElementById("projet-modal-title"),
-      dates: document.getElementById("projet-modal-dates"),
-      description: document.getElementById("projet-modal-description"),
-      skills: document.getElementById("projet-modal-skills"),
-      indexCurrent: document.getElementById("projet-modal-index-current"),
-      indexTotal: document.getElementById("projet-modal-index-total"),
-      prevBtn: document.getElementById("projet-modal-prev"),
-      nextBtn: document.getElementById("projet-modal-next"),
-    };
-  }
-
-  // Formatte la date ISO ("2023-06-01") en repère lisible ("juin 2023") ; les tables sans
-  // date exacte (académique) n'ont que "Date text" et laissent ce chip de côté.
-  function formatProjectDate(p) {
-    const raw = p["Date"];
-    if (!raw) return "";
-    const d = new Date(raw);
-    if (Number.isNaN(d.getTime())) return "";
-    return d.toLocaleDateString(state.lang === "en" ? "en-US" : "fr-FR", { month: "short", year: "numeric" });
-  }
-
-  function fillModalContent(project, index) {
-    const els = getModalEls();
-    els.img.src = projectCover(project);
-    els.img.alt = projectTitle(project);
-    els.title.textContent = projectTitle(project);
-    els.entreprise.textContent = projectByline(project);
-    els.description.textContent = project["Description"] || "";
-
-    const dateChips = [projectDateText(project), formatProjectDate(project)].filter(Boolean);
-    els.dates.innerHTML = dateChips.map((d) => `<span class="projet-modal-date-chip">${d}</span>`).join("");
-
-    const skills = project["Compétences"];
-    els.skills.innerHTML = Array.isArray(skills)
-      ? skills
-          .map((s) => {
-            const color = colorForCompetence(s);
-            return `<li style="background:${color}1c; border:1px solid ${color}40; color:${color};">${emojiForCompetence(s)} ${s}</li>`;
-          })
-          .join("")
-      : "";
-
-    els.indexCurrent.textContent = index + 1;
-    els.indexTotal.textContent = orbitState.projects.length;
-    els.prevBtn.disabled = orbitState.projects.length <= 1;
-    els.nextBtn.disabled = orbitState.projects.length <= 1;
-    els.scroll.scrollTop = 0;
-  }
-
-  function flipOpen(content, fromRect) {
-    const toRect = content.getBoundingClientRect();
-    const dx = fromRect.left + fromRect.width / 2 - (toRect.left + toRect.width / 2);
-    const dy = fromRect.top + fromRect.height / 2 - (toRect.top + toRect.height / 2);
-    const scaleX = fromRect.width / toRect.width;
-    const scaleY = fromRect.height / toRect.height;
-
-    content.style.transition = "none";
-    content.style.opacity = "0.4";
-    content.style.transform = `translate(${dx}px, ${dy}px) scale(${scaleX}, ${scaleY})`;
-    // force reflow avant de lancer la transition
-    // eslint-disable-next-line no-unused-expressions
-    content.offsetHeight;
-    content.style.transition = "transform 0.42s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease-out";
-    content.style.transform = "translate(0, 0) scale(1, 1)";
-    content.style.opacity = "1";
-  }
-
-  function openProjectModal(index, originNode) {
-    const project = orbitState.projects[index];
-    if (!project) return;
-
-    orbitState.activeIndex = index;
-    showOrbitPreview(index);
-
-    const els = getModalEls();
-    fillModalContent(project, index);
-
-    modalState.isOpen = true;
-    modalState.originNode = originNode || null;
-    els.modal.hidden = false;
-    document.body.style.overflow = "hidden";
-
-    if (state.reducedMotion) {
-      requestAnimationFrame(() => els.modal.classList.add("is-open"));
-      return;
-    }
-
-    const fromRect = (originNode || els.content).getBoundingClientRect();
-    requestAnimationFrame(() => {
-      els.modal.classList.add("is-open");
-      flipOpen(els.content, fromRect);
-    });
-  }
-
-  function closeProjectModal() {
-    if (!modalState.isOpen) return;
-    const els = getModalEls();
-    const originNode =
-      document.querySelector(`.orbit-node[data-index="${orbitState.activeIndex}"]`) || modalState.originNode;
-
-    els.modal.classList.remove("is-open");
-
-    if (state.reducedMotion || !originNode) {
-      els.modal.hidden = true;
-      document.body.style.overflow = "";
-      modalState.isOpen = false;
-      return;
-    }
-
-    const toRect = originNode.getBoundingClientRect();
-    const fromRect = els.content.getBoundingClientRect();
-    const dx = toRect.left + toRect.width / 2 - (fromRect.left + fromRect.width / 2);
-    const dy = toRect.top + toRect.height / 2 - (fromRect.top + fromRect.height / 2);
-    const scaleX = toRect.width / fromRect.width;
-    const scaleY = toRect.height / fromRect.height;
-
-    els.content.style.transition = "transform 0.32s cubic-bezier(0.6, 0, 0.8, 0.2), opacity 0.28s ease-in";
-    els.content.style.transform = `translate(${dx}px, ${dy}px) scale(${scaleX}, ${scaleY})`;
-    els.content.style.opacity = "0.3";
-
-    const onEnd = () => {
-      els.modal.hidden = true;
-      document.body.style.overflow = "";
-      els.content.style.transition = "none";
-      els.content.style.transform = "";
-      els.content.style.opacity = "";
-      modalState.isOpen = false;
-      els.content.removeEventListener("transitionend", onEnd);
-    };
-    els.content.addEventListener("transitionend", onEnd);
-  }
-
-  function navigateProject(delta) {
-    if (!modalState.isOpen || orbitState.projects.length <= 1) return;
-    const total = orbitState.projects.length;
-    const newIndex = (orbitState.activeIndex + delta + total) % total;
-    const els = getModalEls();
-    const direction = delta > 0 ? "is-swiping-next" : "is-swiping-prev";
-
-    els.content.classList.add(direction);
-    window.setTimeout(() => {
-      orbitState.activeIndex = newIndex;
-      showOrbitPreview(newIndex);
-      fillModalContent(orbitState.projects[newIndex], newIndex);
-      els.content.classList.remove(direction);
-    }, 220);
-  }
-
-  function initModal() {
-    const modalEl = document.getElementById("projet-modal");
-    if (!modalEl) return; // page sans modal projet
-
-    const els = getModalEls();
-
-    document.querySelectorAll("[data-modal-close]").forEach((el) => {
-      el.addEventListener("click", closeProjectModal);
-    });
-    els.prevBtn.addEventListener("click", () => navigateProject(-1));
-    els.nextBtn.addEventListener("click", () => navigateProject(1));
-
-    document.addEventListener("keydown", (e) => {
-      if (!modalState.isOpen) return;
-      if (e.key === "Escape") closeProjectModal();
-      else if (e.key === "ArrowRight") navigateProject(1);
-      else if (e.key === "ArrowLeft") navigateProject(-1);
-    });
-
-    // Swipe horizontal (mobile / tablette)
-    let touchStartX = 0;
-    let touchStartY = 0;
-    els.content.addEventListener(
-      "touchstart",
-      (e) => {
-        touchStartX = e.touches[0].clientX;
-        touchStartY = e.touches[0].clientY;
-      },
-      { passive: true }
-    );
-    els.content.addEventListener(
-      "touchend",
-      (e) => {
-        const dx = e.changedTouches[0].clientX - touchStartX;
-        const dy = e.changedTouches[0].clientY - touchStartY;
-        if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
-          navigateProject(dx < 0 ? 1 : -1);
-        }
-      },
-      { passive: true }
-    );
-  }
-
   /* ============ SOFTWARES ============ */
   function renderSoftwares() {
     const grid = document.getElementById("softwares-grid");
     if (!grid) return; // page sans section Softwares
 
+    const items = getFicheItemsFor("softwares");
     const softwares = getSoftwaresSorted();
     const grouped = {};
     softwares.forEach((sw, i) => {
       const type = sw["Type"] || "Autres";
       if (!grouped[type]) grouped[type] = [];
-      grouped[type].push({ ...sw, _heroIndex: i });
+      grouped[type].push({ ...sw, _index: i });
     });
 
     grid.innerHTML = Object.entries(grouped)
       .map(
-        ([type, items]) => `
+        ([type, group]) => `
         <div class="skills-group-title" style="grid-column: 1 / -1;">${type}</div>
-        ${items
+        ${group
           .map(
             (sw) => `
-          <div class="software-item" data-hero-index="${sw._heroIndex}">
+          <div class="software-item" data-hero-index="${sw._index}">
             <img src="${softwareLogo(sw)}" alt="${sw["Logiciel"]}">
             <p class="software-item-name">${sw["Logiciel"]}</p>
           </div>`
@@ -1390,7 +1374,10 @@
           .join("")}`
       )
       .join("");
-    applyDeepLinkHighlight();
+
+    grid.querySelectorAll(".software-item").forEach((el) => {
+      el.addEventListener("click", () => openFiche(items[parseInt(el.getAttribute("data-hero-index"), 10)], el));
+    });
   }
 
   /* ============ DIPLÔMES ============ */
@@ -1398,6 +1385,7 @@
     const timelineEl = document.getElementById("diplomes-timeline");
     if (!timelineEl) return; // page sans section Diplômes
 
+    const items = getFicheItemsFor("diplomes");
     const diplomes = getDiplomesSorted();
 
     timelineEl.innerHTML = diplomes
@@ -1410,7 +1398,10 @@
         </li>`
       )
       .join("");
-    applyDeepLinkHighlight();
+
+    timelineEl.querySelectorAll(".timeline-item").forEach((el) => {
+      el.addEventListener("click", () => openFiche(items[parseInt(el.getAttribute("data-hero-index"), 10)], el));
+    });
   }
 
   /* ============ BÉNÉVOLAT ============ */
@@ -1418,6 +1409,7 @@
     const grid = document.getElementById("benevolat-grid");
     if (!grid) return; // page sans section Bénévolat
 
+    const items = getFicheItemsFor("benevolat");
     const benevolat = getBenevolatList();
     grid.innerHTML = benevolat
       .map(
@@ -1430,21 +1422,9 @@
         </div>`
       )
       .join("");
-    applyDeepLinkHighlight();
-  }
 
-  // Lien profond depuis la pile du hero (?open=<index>) vers un élément déjà visible sur la
-  // page : ces pages n'ont pas de fiche cachée, donc on scrolle vers l'élément et on le surligne
-  // brièvement plutôt que d'inventer une modale sans contenu supplémentaire à montrer.
-  function applyDeepLinkHighlight() {
-    const idx = getOpenParamIndex();
-    if (idx == null) return;
-    const el = document.querySelector(`[data-hero-index="${idx}"]`);
-    if (!el) return;
-    requestAnimationFrame(() => {
-      el.scrollIntoView({ behavior: state.reducedMotion ? "auto" : "smooth", block: "center" });
-      el.classList.add("is-deep-link-target");
-      setTimeout(() => el.classList.remove("is-deep-link-target"), 1600);
+    grid.querySelectorAll(".benevolat-card").forEach((el) => {
+      el.addEventListener("click", () => openFiche(items[parseInt(el.getAttribute("data-hero-index"), 10)], el));
     });
   }
 
@@ -1620,7 +1600,7 @@
     initReelControls();
     initReelKeyboard();
     startReelAuto();
-    initModal();
+    initFicheModal();
     initScrollReveals();
     initResizeHandling();
     initHeroNameBounce();
