@@ -757,19 +757,193 @@
         </div>
         <div class="fiche-date-row"></div>
         <div class="fiche-meta-row"></div>
-        <div class="fiche-competences-row"></div>
+        <div class="fiche-competences-widget">
+          <div class="fiche-competences-circle" role="button" tabindex="0" aria-label="Voir les compétences"></div>
+          <div class="fiche-competences-burst"></div>
+          <div class="fiche-competences-row"></div>
+        </div>
         <div class="fiche-divider"></div>
         <div class="fiche-tab-bar"></div>
         <div class="fiche-panel-box"></div>
       </div>`;
     modal.querySelector(".fiche-close-btn").addEventListener("click", closeFiche);
 
+    const circle = modal.querySelector(".fiche-competences-circle");
+    const chipsRow = modal.querySelector(".fiche-competences-row");
+    circle.addEventListener("click", () => toggleFicheCompetences(modal));
+    circle.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleFicheCompetences(modal); }
+    });
+    chipsRow.addEventListener("click", () => toggleFicheCompetences(modal));
+
     document.body.appendChild(backdrop);
     document.body.appendChild(modal);
 
+    const photoLightbox = document.createElement("div");
+    photoLightbox.id = "fiche-photo-lightbox";
+    photoLightbox.className = "fiche-photo-lightbox";
+    photoLightbox.hidden = true;
+    photoLightbox.innerHTML = `
+      <button type="button" class="fiche-photo-lightbox-close" aria-label="Fermer">✕</button>
+      <div class="fiche-photo-lightbox-img"></div>`;
+    photoLightbox.addEventListener("click", closeFichePhotoLightbox);
+    photoLightbox.querySelector(".fiche-photo-lightbox-close").addEventListener("click", closeFichePhotoLightbox);
+    photoLightbox.querySelector(".fiche-photo-lightbox-img").addEventListener("click", (e) => e.stopPropagation());
+    document.body.appendChild(photoLightbox);
+
     document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") closeFiche();
+      if (e.key === "Escape") {
+        closeFichePhotoLightbox();
+        closeFiche();
+      }
     });
+  }
+
+  function openFichePhotoLightbox(url) {
+    const lightbox = document.getElementById("fiche-photo-lightbox");
+    if (!lightbox) return;
+    lightbox.querySelector(".fiche-photo-lightbox-img").style.backgroundImage = `url("${url}")`;
+    lightbox.hidden = false;
+  }
+  function closeFichePhotoLightbox() {
+    const lightbox = document.getElementById("fiche-photo-lightbox");
+    if (lightbox) lightbox.hidden = true;
+  }
+
+  /* ---- Widget compétences : orbes flottantes qui rebondissent, éclatent au clic ---- */
+  const FICHE_ORBIT_R = 44;
+  const FICHE_ORBIT_BALL_R = 12;
+
+  function stopFicheOrbit(modal) {
+    if (modal._orbitRAF) cancelAnimationFrame(modal._orbitRAF);
+    modal._orbitRAF = null;
+    modal._orbitBalls = null;
+    modal._orbitLastTs = null;
+  }
+
+  function startFicheOrbit(modal, ballEls) {
+    const maxDist = FICHE_ORBIT_R - FICHE_ORBIT_BALL_R - 2;
+    const minD = FICHE_ORBIT_BALL_R * 2 * 0.9;
+    modal._orbitBalls = ballEls.map(() => {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = Math.random() * maxDist * 0.6;
+      const speed = 4 + Math.random() * 3;
+      const dir = Math.random() * Math.PI * 2;
+      return { x: Math.cos(angle) * dist, y: Math.sin(angle) * dist, vx: Math.cos(dir) * speed, vy: Math.sin(dir) * speed };
+    });
+
+    const step = (ts) => {
+      if (modal._orbitLastTs == null) modal._orbitLastTs = ts;
+      const dt = Math.min(0.05, (ts - modal._orbitLastTs) / 1000);
+      modal._orbitLastTs = ts;
+      const balls = modal._orbitBalls;
+      if (balls) {
+        for (const b of balls) {
+          b.x += b.vx * dt;
+          b.y += b.vy * dt;
+          const dist = Math.hypot(b.x, b.y);
+          if (dist > maxDist) {
+            const nx = b.x / dist, ny = b.y / dist;
+            const vn = b.vx * nx + b.vy * ny;
+            b.vx -= 2 * vn * nx;
+            b.vy -= 2 * vn * ny;
+            b.vx *= 0.96; b.vy *= 0.96;
+            b.vx += (Math.random() - 0.5) * 0.6;
+            b.vy += (Math.random() - 0.5) * 0.6;
+            b.x = nx * maxDist;
+            b.y = ny * maxDist;
+          }
+        }
+        for (let i = 0; i < balls.length; i++) {
+          for (let j = i + 1; j < balls.length; j++) {
+            const a = balls[i], c = balls[j];
+            const dx = c.x - a.x, dy = c.y - a.y;
+            const d = Math.hypot(dx, dy) || 0.001;
+            if (d < minD) {
+              const nx = dx / d, ny = dy / d;
+              const overlap = (minD - d) / 2;
+              a.x -= nx * overlap; a.y -= ny * overlap;
+              c.x += nx * overlap; c.y += ny * overlap;
+              const avn = a.vx * nx + a.vy * ny;
+              const cvn = c.vx * nx + c.vy * ny;
+              a.vx += (cvn - avn) * nx; a.vy += (cvn - avn) * ny;
+              c.vx += (avn - cvn) * nx; c.vy += (avn - cvn) * ny;
+              a.vx += (Math.random() - 0.5) * 0.4; a.vy += (Math.random() - 0.5) * 0.4;
+              c.vx += (Math.random() - 0.5) * 0.4; c.vy += (Math.random() - 0.5) * 0.4;
+            }
+          }
+        }
+        balls.forEach((b, i) => {
+          const el = ballEls[i];
+          if (el) el.style.transform = `translate(${b.x.toFixed(1)}px,${b.y.toFixed(1)}px)`;
+        });
+      }
+      modal._orbitRAF = requestAnimationFrame(step);
+    };
+    modal._orbitRAF = requestAnimationFrame(step);
+  }
+
+  function renderFicheCompetencesWidget(modal, competences) {
+    const widget = modal.querySelector(".fiche-competences-widget");
+    const circle = modal.querySelector(".fiche-competences-circle");
+    const chipsRow = modal.querySelector(".fiche-competences-row");
+    const headerText = modal.querySelector(".fiche-header-text");
+
+    stopFicheOrbit(modal);
+    modal._competencesOpen = false;
+    circle.classList.remove("is-open");
+    chipsRow.classList.remove("is-open");
+
+    const has = (competences || []).length > 0;
+    widget.classList.toggle("is-visible", has);
+    headerText.classList.toggle("has-competences", has);
+    if (!has) {
+      circle.innerHTML = "";
+      chipsRow.innerHTML = "";
+      return;
+    }
+
+    circle.innerHTML = competences
+      .map((c) => {
+        const color = colorForCompetence(c);
+        return `<div class="fiche-competences-ball" style="background:${color}33; border:1px solid ${color}55;">${emojiForCompetence(c)}</div>`;
+      })
+      .join("");
+    chipsRow.innerHTML = competences
+      .map((c) => {
+        const color = colorForCompetence(c);
+        return `<span class="fiche-chip" style="background:${color}1c; border:1px solid ${color}40; color:${color};">${emojiForCompetence(c)} ${c}</span>`;
+      })
+      .join("");
+
+    startFicheOrbit(modal, Array.from(circle.querySelectorAll(".fiche-competences-ball")));
+  }
+
+  function toggleFicheCompetences(modal) {
+    const circle = modal.querySelector(".fiche-competences-circle");
+    const chipsRow = modal.querySelector(".fiche-competences-row");
+    const burst = modal.querySelector(".fiche-competences-burst");
+    const open = !modal._competencesOpen;
+    modal._competencesOpen = open;
+    circle.classList.toggle("is-open", open);
+    chipsRow.classList.toggle("is-open", open);
+
+    if (open) {
+      const droplets = Array.from({ length: 12 }).map((_, i) => {
+        const angle = ((360 / 12) * i) * (Math.PI / 180);
+        const dist = 30 + ((i * 37) % 24);
+        const dx = Math.round(Math.cos(angle) * dist);
+        const dy = Math.round(Math.sin(angle) * dist + 4);
+        const size = 3 + ((i * 13) % 7);
+        const rot = ((i * 47) % 140) - 70;
+        const delay = ((i * 19) % 9) * 0.012;
+        const duration = 0.55 + ((i * 7) % 5) * 0.05;
+        return `<span class="fiche-competences-droplet" style="--dx:${dx}px; --dy:${dy}px; --rot:${rot}deg; --dur:${duration}s; --delay:${delay}s; width:${size}px; height:${size}px;"></span>`;
+      }).join("");
+      burst.innerHTML = `<span class="fiche-competences-ring"></span><span class="fiche-competences-flash"></span>${droplets}`;
+    } else {
+      burst.innerHTML = "";
+    }
   }
 
   function renderFicheContent(item) {
@@ -800,14 +974,7 @@
     metaRow.innerHTML = item.lieu ? `<span class="fiche-meta-item">📍 ${item.lieu}</span>` : "";
     metaRow.style.display = item.lieu ? "flex" : "none";
 
-    const compRow = modal.querySelector(".fiche-competences-row");
-    compRow.innerHTML = (item.competences || [])
-      .map((c) => {
-        const color = colorForCompetence(c);
-        return `<span class="fiche-chip" style="background:${color}1c; border:1px solid ${color}40; color:${color};">${emojiForCompetence(c)} ${c}</span>`;
-      })
-      .join("");
-    compRow.style.display = (item.competences || []).length ? "flex" : "none";
+    renderFicheCompetencesWidget(modal, item.competences || []);
 
     renderFicheTabBar(modal);
     renderFichePanel(modal);
@@ -850,12 +1017,16 @@
     }
     if (tab.kind === "documents") {
       const photosHtml = tab.photos.length
-        ? `<div class="fiche-doc-grid">${tab.photos.map((url) => `<div class="fiche-doc-photo" style="background-image:url('${url}')"></div>`).join("")}</div>`
+        ? `<div class="fiche-doc-grid">${tab.photos.map((url, i) => `<div class="fiche-doc-photo" data-photo-index="${i}" style="background-image:url('${url}')"></div>`).join("")}</div>`
         : "";
       const pdfsHtml = tab.pdfs
         .map((pdf) => `<a href="${pdf.url}" target="_blank" rel="noopener" class="fiche-doc-pdf-row"><span class="fiche-doc-pdf-icon">📄</span><span class="fiche-doc-pdf-label">${pdf.label}</span></a>`)
         .join("");
       panelBox.innerHTML = photosHtml + pdfsHtml;
+      panelBox.querySelectorAll(".fiche-doc-photo").forEach((el) => {
+        const url = tab.photos[parseInt(el.getAttribute("data-photo-index"), 10)];
+        el.addEventListener("click", () => openFichePhotoLightbox(url));
+      });
       return;
     }
     panelBox.innerHTML = tab.blocks
@@ -909,6 +1080,9 @@
     const modal = document.getElementById("fiche-modal");
     const backdrop = document.getElementById("fiche-backdrop");
     if (!modal || modal.hidden) return;
+
+    closeFichePhotoLightbox();
+    stopFicheOrbit(modal);
 
     modal.style.transform = modal._fromTransform || "translate(0px, 0px) scale(1, 1)";
     modal.style.borderRadius = "18px";
