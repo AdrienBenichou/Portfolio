@@ -442,19 +442,18 @@ img { max-width: 100%; display: block; }
    HERO D'ACCUEIL — carte scoreboard (nom + liste de nav + pile de projets)
    ============================================ */
 .hero--split {
-  padding: 24px;
+  padding: 0;
 }
 
 .hero-card {
   position: relative;
-  width: min(960px, 94vw);
-  min-height: clamp(420px, 56vw, 600px);
+  width: 100vw;
+  height: 100svh;
   display: flex;
   flex-wrap: wrap;
-  border-radius: 20px;
+  border-radius: 0;
   overflow: hidden;
   background: var(--hero-bg);
-  box-shadow: 0 30px 60px rgba(16, 17, 20, 0.35);
 }
 
 .hero-stickers {
