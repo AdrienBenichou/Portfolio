@@ -601,20 +601,32 @@
     tabBar.innerHTML =
       `<div class="fiche-tab-bubble"></div>` +
       tabs
-        .map((t, i) => {
-          const active = i === modal._activeTab;
-          return `<button type="button" class="fiche-tab${active ? " is-active" : ""}" data-tab-index="${i}">
-          <span class="fiche-tab-dot" style="background:${t.dotColor}; opacity:${active ? 1 : 0.5};"></span>
+        .map(
+          (t, i) => `<button type="button" class="fiche-tab" data-tab-index="${i}">
+          <span class="fiche-tab-dot" style="background:${t.dotColor};"></span>
           <span>${t.label}</span>
-        </button>`;
-        })
+        </button>`
+        )
         .join("");
     tabBar.querySelectorAll(".fiche-tab").forEach((btn) => {
       btn.addEventListener("click", () => {
         modal._activeTab = parseInt(btn.getAttribute("data-tab-index"), 10);
-        renderFicheTabBar(modal);
+        updateFicheTabBar(modal);
         renderFichePanel(modal);
       });
+    });
+    updateFicheTabBar(modal);
+  }
+
+  // Met à jour l'onglet actif sans recréer les boutons — la bulle en verre doit rester le
+  // même nœud DOM d'un onglet à l'autre pour que sa transition CSS (left/top/width) glisse
+  // réellement au lieu de sauter (un élément recréé n'a pas d'état de départ à animer depuis).
+  function updateFicheTabBar(modal) {
+    const tabBar = modal.querySelector(".fiche-tab-bar");
+    tabBar.querySelectorAll(".fiche-tab").forEach((btn, i) => {
+      const active = i === modal._activeTab;
+      btn.classList.toggle("is-active", active);
+      btn.querySelector(".fiche-tab-dot").style.opacity = active ? "1" : "0.5";
     });
     measureFicheTabBubble(modal);
   }
@@ -731,6 +743,7 @@
     dragging: false,
     navButtons: [],
     slots: [],
+    switchTimer: null,
   };
 
   function isCompactHeroNav() {
@@ -831,6 +844,15 @@
     heroState.items = getFicheItemsFor(sectionId);
     heroState.navButtons.forEach((btn, i) => btn.classList.toggle("is-active", i === index));
     measureHeroNavBubble();
+
+    // Anime seulement ce changement de section ponctuel — la dérive continue qui suit
+    // (startHeroAutoDrift) doit rester sans transition CSS pour ne pas saccader.
+    const stackEl = document.getElementById("hero-stack");
+    if (stackEl) {
+      stackEl.classList.add("is-switching");
+      clearTimeout(heroState.switchTimer);
+      heroState.switchTimer = setTimeout(() => stackEl.classList.remove("is-switching"), 520);
+    }
     renderHeroStack();
     measureHeroStackStep();
 
@@ -926,11 +948,13 @@
     let startY = 0;
     let startPos = 0;
     let moved = false;
+    let pressedCard = null;
     wrap.addEventListener("pointerdown", (e) => {
       if (e.button !== undefined && e.button !== 0) return;
       startY = e.clientY;
       startPos = heroState.pos;
       moved = false;
+      pressedCard = e.target.closest(".hero-stack-card");
       heroState.dragging = true;
       wrap.classList.add("is-dragging");
       try { wrap.setPointerCapture(e.pointerId); } catch (err) {}
@@ -954,7 +978,14 @@
         // un vrai drag a eu lieu — on avale le click qui suit pour ne pas déclencher une navigation
         const suppressClick = (ce) => { ce.stopPropagation(); ce.preventDefault(); };
         document.addEventListener("click", suppressClick, { capture: true, once: true });
+      } else if (pressedCard) {
+        // setPointerCapture route le "click" natif vers `wrap` plutôt que vers la carte
+        // survolée (y compris pour les cartes du fond, pas seulement celle du dessus) —
+        // on ouvre donc la fiche nous-mêmes ici, plutôt que de compter sur un click
+        // individuel par carte qui ne se déclenche jamais en pratique.
+        activateHeroCard(pressedCard);
       }
+      pressedCard = null;
     };
     wrap.addEventListener("pointerup", end);
     wrap.addEventListener("pointercancel", end);
@@ -1189,9 +1220,10 @@
           ${
             isOpen
               ? `<div class="all-projects-filter-menu ${align}">${g.values
-                  .map(
-                    (v) => `<button type="button" class="all-projects-filter-chip${active.includes(v) ? " is-active" : ""}" data-group="${g.key}" data-value="${v}">${v}</button>`
-                  )
+                  .map((v) => {
+                    const label = g.key === "filterComp" && COMPETENCE_EMOJI[v] ? `${COMPETENCE_EMOJI[v]} ${v}` : v;
+                    return `<button type="button" class="all-projects-filter-chip${active.includes(v) ? " is-active" : ""}" data-group="${g.key}" data-value="${v}">${label}</button>`;
+                  })
                   .join("")}</div>`
               : ""
           }
@@ -1207,7 +1239,7 @@
 
     grid.innerHTML = filtered
       .map(({ item, i }) => `
-        <button type="button" class="all-projects-card" data-index="${i}">
+        <button type="button" class="all-projects-card" data-index="${i}" style="--tint:${(item.tint || "#1B4FDB") + "26"}">
           <div class="all-projects-card-media"${item.coverUrl ? ` style="background-image:url('${item.coverUrl}')"` : ""}></div>
           <p class="all-projects-card-title">${item.title}</p>
           <p class="all-projects-card-meta">${(item.dateChips || []).join(" · ")}</p>
