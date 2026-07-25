@@ -1,7 +1,7 @@
 /* ============================================
    main.js — Portfolio Adrien Benichou
    Écran unique fidèle au design Claude Design : hero scoreboard (nav + pile de
-   preview), fiche plein écran, overlay "Tous mes X", données Airtable (data.json), i18n.
+   preview), fiche plein écran, overlay "Tous mes X", données Airtable (data.json).
    ============================================ */
 
 (function () {
@@ -9,7 +9,6 @@
 
   /* ============ ÉTAT GLOBAL ============ */
   const state = {
-    lang: "fr",
     data: null,
     reducedMotion: false,
   };
@@ -18,16 +17,13 @@
   // Comme dans le design Claude Design : cliquer une section change juste ce qui s'affiche
   // dans le hero (pile de preview), sans jamais changer de page.
   const NAV_SECTIONS = [
-    { id: "apropos", labelKey: "nav.apropos", tint: "#1B4FDB" },
-    { id: "projets", labelKey: "nav.projets", tint: "#FF6B35" },
-    { id: "softwares", labelKey: "nav.softwares", tint: "#0E7C86" },
-    { id: "diplomes", labelKey: "nav.diplomes", tint: "#12379E" },
-    { id: "benevolat", labelKey: "nav.benevolat", tint: "#E91E8C" },
+    { id: "apropos", label: "À propos de moi", tint: "#1B4FDB" },
+    { id: "projets", label: "Mes projets", tint: "#FF6B35" },
+    { id: "softwares", label: "Softwares", tint: "#0E7C86" },
+    { id: "diplomes", label: "Diplômes", tint: "#12379E" },
+    { id: "benevolat", label: "Bénévolat", tint: "#E91E8C" },
   ];
-  const ALL_OVERLAY_LABELS = {
-    fr: { projets: "Tous mes projets", softwares: "Tous mes softwares", diplomes: "Tous mes diplômes", benevolat: "Tous mes bénévolats" },
-    en: { projets: "All my projects", softwares: "All my softwares", diplomes: "All my degrees", benevolat: "All my volunteering" },
-  };
+  const ALL_OVERLAY_LABELS = { projets: "Tous mes projets", softwares: "Tous mes softwares", diplomes: "Tous mes diplômes", benevolat: "Tous mes bénévolats" };
 
   // Couleur + emoji par compétence : hash déterministe, mêmes teintes que le design handoff,
   // pour que deux compétences identiques (hero, modal, softwares...) restent reconnaissables.
@@ -55,59 +51,6 @@
   }
   function colorForCompetence(name) {
     return COMPETENCE_PALETTE[hashString(name) % COMPETENCE_PALETTE.length];
-  }
-
-  /* ============ TRADUCTIONS (labels d'interface uniquement) ============ */
-  const I18N = {
-    fr: {
-      "hero.eyebrow": "Sport × Digital",
-      "nav.apropos": "À propos de moi",
-      "nav.projets": "Mes projets",
-      "nav.softwares": "Softwares",
-      "nav.diplomes": "Diplômes",
-      "nav.benevolat": "Bénévolat",
-      "nav.home": "← Accueil",
-      "contact.title": "Contact",
-      "contact.email": "Email",
-    },
-    en: {
-      "hero.eyebrow": "Sport × Digital",
-      "nav.apropos": "About me",
-      "nav.projets": "My projects",
-      "nav.softwares": "Softwares",
-      "nav.diplomes": "Degrees",
-      "nav.benevolat": "Volunteering",
-      "nav.home": "← Home",
-      "contact.title": "Contact",
-      "contact.email": "Email",
-    },
-  };
-
-  function applyI18n() {
-    document.querySelectorAll("[data-i18n]").forEach((el) => {
-      const key = el.getAttribute("data-i18n");
-      const val = I18N[state.lang][key];
-      if (val) el.textContent = val;
-    });
-    document.documentElement.setAttribute("lang", state.lang);
-    document.documentElement.setAttribute("data-lang", state.lang);
-  }
-
-  function initLangSwitcher() {
-    const btns = document.querySelectorAll(".lang-btn");
-    btns.forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const lang = btn.getAttribute("data-lang-btn");
-        state.lang = lang;
-        btns.forEach((b) => {
-          const isActive = b === btn;
-          b.classList.toggle("is-active", isActive);
-          b.setAttribute("aria-pressed", isActive);
-        });
-        applyI18n();
-        if (heroState.navButtons.length) setHeroSection(heroState.sectionIndex);
-      });
-    });
   }
 
   /* ============ CURSEUR CUSTOM ============ */
@@ -332,7 +275,7 @@
     if (!raw) return "";
     const d = new Date(raw);
     if (Number.isNaN(d.getTime())) return "";
-    return d.toLocaleDateString(state.lang === "en" ? "en-US" : "fr-FR", { month: "short", year: "numeric" });
+    return d.toLocaleDateString("fr-FR", { month: "short", year: "numeric" });
   }
 
   function buildProjectFiche(p, tint) {
@@ -448,17 +391,17 @@
     modal.hidden = true;
     modal.innerHTML = `
       <button type="button" class="fiche-close-btn" aria-label="Fermer">✕</button>
-      <div class="fiche-cover"></div>
       <div class="fiche-body">
         <div class="fiche-header-row">
+          <div class="fiche-cover"></div>
           <div class="fiche-photo"></div>
           <div class="fiche-header-text">
             <p class="fiche-kicker"></p>
             <p class="fiche-title"></p>
+            <div class="fiche-date-row"></div>
+            <div class="fiche-meta-row"></div>
           </div>
         </div>
-        <div class="fiche-date-row"></div>
-        <div class="fiche-meta-row"></div>
         <div class="fiche-competences-widget">
           <div class="fiche-competences-circle" role="button" tabindex="0" aria-label="Voir les compétences"></div>
           <div class="fiche-competences-burst"></div>
@@ -655,9 +598,9 @@
     modal._activeTab = 0;
 
     const cover = modal.querySelector(".fiche-cover");
+    cover.style.display = item.isProfile ? "none" : "block";
     cover.style.background = item.coverUrl ? `#1a1c22 url("${item.coverUrl}") center/cover no-repeat` : `linear-gradient(160deg, ${item.tint || "#1B4FDB"}, #0d0e12)`;
 
-    modal.querySelector(".fiche-header-row").classList.toggle("is-profile", !!item.isProfile);
     const photo = modal.querySelector(".fiche-photo");
     photo.style.display = item.isProfile ? "block" : "none";
     photo.style.backgroundImage = item.isProfile && item.coverUrl ? `url("${item.coverUrl}")` : "none";
@@ -826,7 +769,7 @@
         (section, i) => `
       <button type="button" class="hero-nav-item" data-index="${i}" style="--tint:${section.tint}">
         <span class="hero-nav-item-dot"></span>
-        <p class="hero-nav-item-label" data-i18n="${section.labelKey}">${I18N[state.lang][section.labelKey]}</p>
+        <p class="hero-nav-item-label">${section.label}</p>
       </button>`
       ).join("")
     );
@@ -920,7 +863,7 @@
     if (cta) {
       const visible = sectionId !== "apropos";
       cta.classList.toggle("is-visible", visible);
-      if (visible) cta.textContent = `${ALL_OVERLAY_LABELS[state.lang][sectionId]} →`;
+      if (visible) cta.textContent = `${ALL_OVERLAY_LABELS[sectionId]} →`;
     }
   }
 
@@ -1220,7 +1163,7 @@
       allOverlayState.filterOrg = [];
       allOverlayState.openGroup = null;
     }
-    overlay.querySelector(".all-projects-title").textContent = ALL_OVERLAY_LABELS[state.lang][sectionId] || "";
+    overlay.querySelector(".all-projects-title").textContent = ALL_OVERLAY_LABELS[sectionId] || "";
     renderAllOverlayGrid();
     overlay.hidden = false;
     document.body.style.overflow = "hidden";
@@ -1284,18 +1227,6 @@
           <p class="all-projects-card-meta">${(item.dateChips || []).join(" · ")}</p>
         </button>`)
       .join("");
-  }
-
-  /* ============ CONTACT ============ */
-  function renderContact() {
-    const contactMail = document.getElementById("contact-mail");
-    if (!contactMail) return; // page sans section Contact
-
-    const moi = (state.data && state.data.moi && state.data.moi[0]) || {};
-    const email = moi["Email"] || moi["Mail"];
-    if (email) {
-      contactMail.href = `mailto:${email}`;
-    }
   }
 
   /* ============ HELPER ============ */
@@ -1421,8 +1352,6 @@
   document.addEventListener("DOMContentLoaded", () => {
     state.reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    applyI18n();
-    initLangSwitcher();
     initCustomCursor();
     initFicheModal();
     initAllOverlay();
@@ -1430,7 +1359,6 @@
 
     loadData().then(() => {
       initHomeHero();
-      renderContact();
     });
   });
 })();

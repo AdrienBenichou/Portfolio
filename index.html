@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr" data-lang="fr">
+<html lang="fr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,20 +13,10 @@
 
 <link rel="stylesheet" href="style.css">
 </head>
-<body data-page="home">
+<body>
 
   <!-- Curseur custom (desktop only, géré/affiché en JS) -->
   <div id="custom-cursor" aria-hidden="true"></div>
-
-  <!-- Switcher FR/EN, toujours accessible -->
-  <div class="lang-switcher" role="group" aria-label="Changer de langue">
-    <button type="button" class="lang-btn is-active" data-lang-btn="fr" aria-pressed="true">FR</button>
-    <button type="button" class="lang-btn" data-lang-btn="en" aria-pressed="false">EN</button>
-  </div>
-
-  <nav class="page-nav" aria-label="Navigation site">
-    <a href="contact.html" class="page-nav-link" data-i18n="contact.title">Contact</a>
-  </nav>
 
   <!-- ============ HERO : nom + liste de nav (score) + pile de projets, seule navigation de la page d'accueil ============ -->
   <header id="hero" class="hero hero--split">
@@ -38,7 +28,7 @@
 
       <div class="hero-main">
         <p class="hero-name" id="hero-bg-name">Adrien Benichou</p>
-        <p class="hero-eyebrow" data-i18n="hero.eyebrow">Sport × Digital</p>
+        <p class="hero-eyebrow">Sport × Digital</p>
 
         <div class="hero-nav" id="hero-nav" role="group" aria-label="Navigation principale">
           <div class="hero-nav-bubble" id="hero-nav-bubble" aria-hidden="true"></div>
