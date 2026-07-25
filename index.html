@@ -15,9 +15,6 @@
 </head>
 <body>
 
-  <!-- Curseur custom (desktop only, géré/affiché en JS) -->
-  <div id="custom-cursor" aria-hidden="true"></div>
-
   <!-- ============ HERO : nom + liste de nav (score) + pile de projets, seule navigation de la page d'accueil ============ -->
   <header id="hero" class="hero hero--split">
     <div class="hero-card" id="hero-card">
@@ -34,6 +31,8 @@
           <div class="hero-nav-bubble" id="hero-nav-bubble" aria-hidden="true"></div>
           <!-- boutons de section injectés par main.js -->
         </div>
+
+        <button type="button" class="hero-all-cta" id="hero-all-cta"></button>
       </div>
 
       <div class="hero-stack-wrap" id="hero-stack-wrap" tabindex="0" role="group" aria-label="Aperçu de la section">
@@ -41,8 +40,6 @@
           <!-- cartes de preview injectées par main.js -->
         </div>
       </div>
-
-      <button type="button" class="hero-all-cta" id="hero-all-cta"></button>
     </div>
   </header>
 

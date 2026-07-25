@@ -53,43 +53,6 @@
     return COMPETENCE_PALETTE[hashString(name) % COMPETENCE_PALETTE.length];
   }
 
-  /* ============ CURSEUR CUSTOM ============ */
-  function initCustomCursor() {
-    const cursor = document.getElementById("custom-cursor");
-    const hero = document.getElementById("hero");
-    if (!cursor || !window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
-
-    window.addEventListener("mousemove", (e) => {
-      cursor.style.transform = `translate(${e.clientX}px, ${e.clientY}px) translate(-50%, -50%)`;
-    });
-
-    // Délégation : fonctionne aussi pour les cartes/nœuds injectés dynamiquement
-    document.addEventListener("mouseover", (e) => {
-      if (hero && hero.contains(e.target)) cursor.classList.add("is-dark");
-
-      const previewNode = e.target.closest(".hero-stack-card, .all-projects-card, .fiche-doc-photo");
-      const interactive = e.target.closest("a, button, .hero-stack-card, .all-projects-card, .fiche-doc-photo");
-
-      if (interactive) cursor.classList.add("is-hover");
-      if (previewNode) {
-        cursor.classList.add("is-label");
-        cursor.setAttribute("data-cursor-label", "VOIR");
-      }
-    });
-
-    document.addEventListener("mouseout", (e) => {
-      if (hero && hero.contains(e.target) && !hero.contains(e.relatedTarget)) {
-        cursor.classList.remove("is-dark");
-      }
-      const interactive = e.target.closest("a, button, .hero-stack-card, .all-projects-card, .fiche-doc-photo");
-      if (interactive && !interactive.contains(e.relatedTarget)) {
-        cursor.classList.remove("is-hover");
-        cursor.classList.remove("is-label");
-        cursor.removeAttribute("data-cursor-label");
-      }
-    });
-  }
-
   /* ============ FICHE — modal détail plein écran (copie du composant Claude Design) ============ */
   // Un item de fiche est un objet normalisé, identique quelle que soit la section d'origine
   // (Airtable expose des colonnes différentes par table) — c'est ce qui alimente à la fois la
@@ -408,7 +371,9 @@
           <div class="fiche-competences-row"></div>
         </div>
         <div class="fiche-divider"></div>
-        <div class="fiche-tab-bar"></div>
+        <div class="fiche-tab-bar">
+          <div class="fiche-tab-bubble"></div>
+        </div>
         <div class="fiche-panel-box"></div>
       </div>`;
     modal.querySelector(".fiche-close-btn").addEventListener("click", closeFiche);
@@ -630,19 +595,20 @@
     const tabBar = modal.querySelector(".fiche-tab-bar");
     if (!tabs.length) {
       tabBar.style.display = "none";
-      tabBar.innerHTML = "";
       return;
     }
     tabBar.style.display = "flex";
-    tabBar.innerHTML = tabs
-      .map((t, i) => {
-        const active = i === modal._activeTab;
-        return `<button type="button" class="fiche-tab${active ? " is-active" : ""}" data-tab-index="${i}">
+    tabBar.innerHTML =
+      `<div class="fiche-tab-bubble"></div>` +
+      tabs
+        .map((t, i) => {
+          const active = i === modal._activeTab;
+          return `<button type="button" class="fiche-tab${active ? " is-active" : ""}" data-tab-index="${i}">
           <span class="fiche-tab-dot" style="background:${t.dotColor}; opacity:${active ? 1 : 0.5};"></span>
           <span>${t.label}</span>
         </button>`;
-      })
-      .join("");
+        })
+        .join("");
     tabBar.querySelectorAll(".fiche-tab").forEach((btn) => {
       btn.addEventListener("click", () => {
         modal._activeTab = parseInt(btn.getAttribute("data-tab-index"), 10);
@@ -650,6 +616,19 @@
         renderFichePanel(modal);
       });
     });
+    measureFicheTabBubble(modal);
+  }
+
+  function measureFicheTabBubble(modal) {
+    const tabBar = modal.querySelector(".fiche-tab-bar");
+    const bubble = modal.querySelector(".fiche-tab-bubble");
+    const activeBtn = tabBar.querySelector(".fiche-tab.is-active");
+    if (!bubble || !activeBtn) return;
+    bubble.style.left = `${activeBtn.offsetLeft}px`;
+    bubble.style.top = `${activeBtn.offsetTop}px`;
+    bubble.style.width = `${activeBtn.offsetWidth}px`;
+    bubble.style.height = `${activeBtn.offsetHeight}px`;
+    bubble.classList.add("is-visible");
   }
 
   function renderFichePanel(modal) {
@@ -703,6 +682,7 @@
     document.body.style.overflow = "hidden";
     modal.hidden = false;
     backdrop.hidden = false;
+    measureFicheTabBubble(modal); // le modal était hidden lors du 1er rendu, offsetWidth valait 0
     modal.style.transition = "none";
     backdrop.style.transition = "none";
     modal.style.transform = fromTransform;
@@ -797,9 +777,6 @@
     });
 
     heroState.navButtons.forEach((btn, i) => {
-      btn.addEventListener("mouseenter", () => {
-        if (!isCompactHeroNav()) setHeroSection(i);
-      });
       btn.addEventListener("click", () => {
         setHeroSection(i);
       });
@@ -1075,6 +1052,13 @@
   // pas des champs Airtable bruts — une seule source de vérité par item, quelle que soit la table.
   const allOverlayState = { sectionId: null, filterType: [], filterComp: [], filterOrg: [], openGroup: null };
 
+  // Ordre fixe des types de mission (identique au design : typeOrder), plutôt que l'ordre
+  // d'apparition brut des données.
+  const TYPE_ORDER = ["Projet pro", "Stage", "Job étudiant", "Étude", "Césure"];
+  function sortByTypeOrder(values) {
+    return [...values.filter((v) => TYPE_ORDER.includes(v)).sort((a, b) => TYPE_ORDER.indexOf(a) - TYPE_ORDER.indexOf(b)), ...values.filter((v) => !TYPE_ORDER.includes(v))];
+  }
+
   function getOverlayFilterGroups(sectionId) {
     if (sectionId === "softwares") {
       return [{ key: "filterType", title: "Type", source: (item) => (item.kicker ? [item.kicker] : []) }];
@@ -1083,7 +1067,7 @@
       return [{ key: "filterType", title: "Type", source: (item) => item.competences || [] }];
     }
     return [
-      { key: "filterType", title: "Type", source: (item) => ((item.dateChips || [])[0] ? [item.dateChips[0]] : []) },
+      { key: "filterType", title: "Type", source: (item) => ((item.dateChips || [])[0] ? [item.dateChips[0]] : []), sort: sortByTypeOrder },
       { key: "filterComp", title: "Compétence", source: (item) => item.competences || [] },
       { key: "filterOrg", title: "Organisation", source: (item) => (item.kicker ? [item.kicker] : []) },
     ];
@@ -1185,24 +1169,26 @@
     const s = allOverlayState;
     const groups = getOverlayFilterGroups(s.sectionId).map((g) => ({
       ...g,
-      values: Array.from(new Set(all.flatMap(g.source))),
+      values: g.sort ? g.sort(Array.from(new Set(all.flatMap(g.source)))) : Array.from(new Set(all.flatMap(g.source))),
     }));
     const groupByKey = Object.fromEntries(groups.map((g) => [g.key, g]));
     const activeCount = s.filterType.length + s.filterComp.length + s.filterOrg.length;
 
     filterBar.innerHTML =
       groups
-        .map((g) => {
+        .map((g, gi) => {
           const active = s[g.key];
           const isOpen = s.openGroup === g.key;
+          const align = gi === 0 ? "align-left" : gi === groups.length - 1 ? "align-right" : "align-center";
           return `
         <div class="all-projects-filter-group">
           <button type="button" class="all-projects-filter-btn${active.length ? " is-active" : ""}" data-group="${g.key}">
-            <span>${g.title}${active.length ? ` (${active.length})` : ""}</span> <span class="all-projects-filter-chevron">▾</span>
+            <span>${g.title}</span> <span class="all-projects-filter-chevron">▾</span>
+            ${active.length ? `<span class="all-projects-filter-badge">${active.length}</span>` : ""}
           </button>
           ${
             isOpen
-              ? `<div class="all-projects-filter-menu">${g.values
+              ? `<div class="all-projects-filter-menu ${align}">${g.values
                   .map(
                     (v) => `<button type="button" class="all-projects-filter-chip${active.includes(v) ? " is-active" : ""}" data-group="${g.key}" data-value="${v}">${v}</button>`
                   )
@@ -1352,7 +1338,6 @@
   document.addEventListener("DOMContentLoaded", () => {
     state.reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    initCustomCursor();
     initFicheModal();
     initAllOverlay();
     initHeroNameBounce();

@@ -72,68 +72,6 @@ img { max-width: 100%; display: block; }
 }
 
 /* ============================================
-   CURSEUR CUSTOM (desktop only)
-   ============================================ */
-#custom-cursor {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--color-primary);
-  pointer-events: none;
-  z-index: 9999;
-  transform: translate(-50%, -50%);
-  transition: width 0.2s var(--ease-out), height 0.2s var(--ease-out), background 0.2s var(--ease-out);
-  will-change: transform;
-  display: none;
-}
-#custom-cursor::before {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  border: 1px solid currentColor;
-  color: rgba(255, 255, 255, 0.4);
-  transform: translate(-50%, -50%) scale(0.4);
-  opacity: 0;
-  transition: transform 0.25s var(--ease-out), opacity 0.25s var(--ease-out);
-}
-#custom-cursor::after {
-  content: attr(data-cursor-label);
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  white-space: nowrap;
-  opacity: 0;
-  transition: opacity 0.2s var(--ease-out);
-}
-@media (hover: hover) and (pointer: fine) {
-  #custom-cursor { display: block; }
-}
-#custom-cursor.is-hover {
-  background: var(--color-text);
-}
-#custom-cursor.is-hover::before {
-  transform: translate(-50%, -50%) scale(1);
-  opacity: 1;
-  color: rgba(20, 22, 28, 0.28);
-}
-#custom-cursor.is-dark::before { color: rgba(255, 255, 255, 0.4); }
-#custom-cursor.is-dark.is-hover { background: #fff; }
-#custom-cursor.is-label::before { opacity: 0; transform: translate(-50%, -50%) scale(1.4); }
-#custom-cursor.is-label::after { opacity: 1; }
-#custom-cursor.is-label { background: transparent; }
-
-/* ============================================
    HERO — hub circulaire signature (inspiré aikawakenichi)
    ============================================ */
 .hero {
@@ -223,7 +161,7 @@ img { max-width: 100%; display: block; }
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 14px;
+  gap: 18px;
 }
 .hero-name {
   position: relative;
@@ -251,7 +189,7 @@ img { max-width: 100%; display: block; }
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 18px;
   outline: none;
 }
 .hero-nav-item {
@@ -324,7 +262,9 @@ img { max-width: 100%; display: block; }
   border: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   flex-direction: column;
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.5s;
 }
+.hero-stack-wrap.is-dragging .hero-stack-card { transition: none; }
 .hero-stack-card-media {
   flex: 1;
   margin: 14px 14px 8px;
@@ -388,8 +328,8 @@ img { max-width: 100%; display: block; }
 }
 .hero-all-cta.is-visible {
   display: block;
-  align-self: center;
-  margin: 0 0 20px;
+  align-self: flex-start;
+  margin-top: 8px;
   padding: 10px 20px;
   border-radius: 999px;
   background: radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.07) 60%);
@@ -510,10 +450,27 @@ img { max-width: 100%; display: block; }
 }
 .all-projects-filter-btn.is-active { border-color: rgba(255, 255, 255, 0.28); background: radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.05) 60%); }
 .all-projects-filter-chevron { font-size: 10px; color: rgba(255, 255, 255, 0.5); flex-shrink: 0; }
+.all-projects-filter-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #fff;
+  color: #111319;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  overflow: visible;
+}
 .all-projects-filter-menu {
   position: absolute;
   top: calc(100% + 6px);
-  left: 0;
   z-index: 20;
   display: flex;
   flex-wrap: wrap;
@@ -529,6 +486,9 @@ img { max-width: 100%; display: block; }
   border: 1px solid rgba(255, 255, 255, 0.14);
   box-shadow: 0 16px 32px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
+.all-projects-filter-menu.align-left { left: 0; }
+.all-projects-filter-menu.align-right { right: 0; }
+.all-projects-filter-menu.align-center { left: 50%; transform: translateX(-50%); }
 .all-projects-filter-chip {
   padding: 10px 16px;
   border-radius: 999px;
@@ -806,9 +766,10 @@ img { max-width: 100%; display: block; }
   background-position: center; background-size: contain; background-repeat: no-repeat;
 }
 
-.fiche-tab-bar { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; padding: 2px; }
+.fiche-tab-bar { position: relative; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; padding: 2px; }
 .fiche-tab {
   position: relative;
+  z-index: 2;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -821,10 +782,27 @@ img { max-width: 100%; display: block; }
   font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
-  transition: color 0.2s var(--ease-out), background 0.2s var(--ease-out);
+  transition: color 0.2s var(--ease-out);
 }
-.fiche-tab.is-active { background: rgba(255, 255, 255, 0.1); color: rgba(255, 255, 255, 0.95); }
+.fiche-tab.is-active { color: rgba(255, 255, 255, 0.95); }
 .fiche-tab-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; transition: opacity 0.3s; }
+.fiche-tab-bubble {
+  position: absolute;
+  z-index: 1;
+  top: 2px;
+  left: 0;
+  width: 0;
+  height: 0;
+  border-radius: 999px;
+  background: radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.07) 60%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  opacity: 0;
+  transition: left 0.38s cubic-bezier(0.34, 1.7, 0.4, 1), top 0.38s cubic-bezier(0.34, 1.7, 0.4, 1), width 0.38s cubic-bezier(0.34, 1.7, 0.4, 1), height 0.38s cubic-bezier(0.34, 1.7, 0.4, 1), opacity 0.2s;
+}
+.fiche-tab-bubble.is-visible { opacity: 1; }
 
 .fiche-panel-box { display: flex; flex-direction: column; gap: 12px; padding: 4px 2px; }
 .fiche-text-block { margin: 0; font-size: 15px; line-height: 1.6; color: rgba(255, 255, 255, 0.78); }
