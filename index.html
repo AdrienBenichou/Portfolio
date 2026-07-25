@@ -24,6 +24,10 @@
     <button type="button" class="lang-btn" data-lang-btn="en" aria-pressed="false">EN</button>
   </div>
 
+  <nav class="page-nav" aria-label="Navigation site">
+    <a href="contact.html" class="page-nav-link" data-i18n="contact.title">Contact</a>
+  </nav>
+
   <!-- ============ HERO : nom + liste de nav (score) + pile de projets, seule navigation de la page d'accueil ============ -->
   <header id="hero" class="hero hero--split">
     <div class="hero-card" id="hero-card">
@@ -48,13 +52,9 @@
         </div>
       </div>
 
-      <a href="projets.html" class="hero-all-cta" id="hero-all-cta" data-i18n="hero.allProjects">Tous mes projets →</a>
+      <button type="button" class="hero-all-cta" id="hero-all-cta"></button>
     </div>
   </header>
-
-  <!-- AOS : lib d'animation légère pour les scroll-reveals -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.js"></script>
 
   <script src="main.js" defer></script>
 </body>
