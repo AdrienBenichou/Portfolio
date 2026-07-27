@@ -346,15 +346,19 @@ img { max-width: 100%; display: block; }
 .hero-software-cell {
   position: relative;
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.04) 65%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   cursor: pointer;
   overflow: hidden;
-  transition: transform 0.2s var(--ease-out), border-color 0.2s ease, background 0.2s ease;
+  transition: transform 0.2s var(--ease-out), border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
 }
 .hero-software-cell:hover {
-  border-color: rgba(255, 255, 255, 0.22);
-  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.26);
+  background: radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.06) 65%);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.2);
   transform: translateY(-2px);
 }
 .hero-software-cell-logo {
@@ -373,8 +377,9 @@ img { max-width: 100%; display: block; }
 }
 .hero-software-cell.is-more:hover {
   transform: none;
-  border-color: rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.14);
+  background: radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.04) 65%);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.16);
 }
 .hero-software-cell-dot {
   width: 6px;
