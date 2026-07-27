@@ -807,6 +807,7 @@
 
     initHeroNavDrag(navEl);
     initHeroStackDrag(stackWrap);
+    initHeroSoftwareGridKeyboard();
 
     stackWrap.addEventListener("keydown", (e) => {
       if (e.key === "ArrowDown") {
@@ -844,6 +845,14 @@
     heroState.items = getFicheItemsFor(sectionId);
     heroState.navButtons.forEach((btn, i) => btn.classList.toggle("is-active", i === index));
     measureHeroNavBubble();
+
+    // "Softwares" remplace la pile par une grille de logos (pas de dérive/drag à gérer).
+    const isSoftwareGrid = sectionId === "softwares";
+    const stackWrap = document.getElementById("hero-stack-wrap");
+    const gridEl = document.getElementById("hero-software-grid");
+    if (stackWrap) stackWrap.classList.toggle("is-grid-mode", isSoftwareGrid);
+    if (gridEl) gridEl.classList.toggle("is-active", isSoftwareGrid);
+    if (isSoftwareGrid) renderHeroSoftwareGrid(heroState.items, NAV_SECTIONS[index].tint);
 
     // Anime seulement ce changement de section ponctuel — la dérive continue qui suit
     // (startHeroAutoDrift) doit rester sans transition CSS pour ne pas saccader.
@@ -944,6 +953,52 @@
     if (card._item) openFiche(card._item, card);
   }
 
+  function initHeroSoftwareGridKeyboard() {
+    const gridEl = document.getElementById("hero-software-grid");
+    if (!gridEl) return;
+    gridEl.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      const cell = e.target.closest(".hero-software-cell:not(.is-more)");
+      if (!cell || !cell._item) return;
+      e.preventDefault();
+      openFiche(cell._item, cell);
+    });
+  }
+
+  // Grille de logos "softwares" : 4 colonnes x 5 lignes de cases carrées, logo seul (pas de
+  // titre). Au-delà de 20 logiciels, la dernière case devient "•••" plutôt que de déborder.
+  const SOFTWARE_GRID_COLS = 4;
+  const SOFTWARE_GRID_ROWS = 5;
+  const SOFTWARE_GRID_MAX = SOFTWARE_GRID_COLS * SOFTWARE_GRID_ROWS;
+
+  function renderHeroSoftwareGrid(items, tint) {
+    const gridEl = document.getElementById("hero-software-grid");
+    if (!gridEl) return;
+    gridEl.style.setProperty("--tint", tint);
+    gridEl.innerHTML = "";
+
+    const overflow = items.length > SOFTWARE_GRID_MAX;
+    const visibleCount = overflow ? SOFTWARE_GRID_MAX - 1 : items.length;
+    for (let i = 0; i < visibleCount; i++) {
+      const item = items[i];
+      const cell = document.createElement("div");
+      cell.className = "hero-software-cell";
+      cell.setAttribute("role", "button");
+      cell.setAttribute("tabindex", "0");
+      cell.setAttribute("aria-label", item.title || "Logiciel");
+      cell.innerHTML = `<span class="hero-software-cell-logo" style="background-image:url('${item.coverUrl}')"></span>`;
+      cell._item = item;
+      gridEl.appendChild(cell);
+    }
+    if (overflow) {
+      const more = document.createElement("div");
+      more.className = "hero-software-cell is-more";
+      more.setAttribute("aria-hidden", "true");
+      more.innerHTML = `<span class="hero-software-cell-dot"></span><span class="hero-software-cell-dot"></span><span class="hero-software-cell-dot"></span>`;
+      gridEl.appendChild(more);
+    }
+  }
+
   function initHeroStackDrag(wrap) {
     let startY = 0;
     let startPos = 0;
@@ -954,7 +1009,7 @@
       startY = e.clientY;
       startPos = heroState.pos;
       moved = false;
-      pressedCard = e.target.closest(".hero-stack-card");
+      pressedCard = e.target.closest(".hero-stack-card, .hero-software-cell:not(.is-more)");
       heroState.dragging = true;
       wrap.classList.add("is-dragging");
       try { wrap.setPointerCapture(e.pointerId); } catch (err) {}
@@ -1026,6 +1081,7 @@
       const dt = Math.min(ts - prevTs, 100);
       prevTs = ts;
       if (heroState.dragging || heroState.items.length <= 1) return;
+      if (NAV_SECTIONS[heroState.sectionIndex].id === "softwares") return;
       heroState.pos += HERO_AUTO_DRIFT_RATE * dt;
       renderHeroStack();
     }

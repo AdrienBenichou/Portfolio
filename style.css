@@ -328,6 +328,65 @@ img { max-width: 100%; display: block; }
   text-overflow: ellipsis;
 }
 
+/* Grille de logos "softwares" : remplace la pile pour cette section — 4 colonnes x 5 lignes
+   de cases carrées (aspect-ratio 4:5 tenu en boîte pour rester carré quel que soit l'espace
+   disponible), logo affiché en entier (background-size: contain) sans titre. */
+.hero-software-grid {
+  display: none;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(5, 1fr);
+  gap: 8px;
+  width: min(100%, 480px);
+  aspect-ratio: 4 / 5;
+  max-height: 100%;
+}
+.hero-software-grid.is-active { display: grid; }
+.hero-stack-wrap.is-grid-mode .hero-stack { display: none; }
+
+.hero-software-cell {
+  position: relative;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform 0.2s var(--ease-out), border-color 0.2s ease, background 0.2s ease;
+}
+.hero-software-cell:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.09);
+  transform: translateY(-2px);
+}
+.hero-software-cell-logo {
+  position: absolute;
+  inset: 16%;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.hero-software-cell.is-more {
+  cursor: default;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+.hero-software-cell.is-more:hover {
+  transform: none;
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+}
+.hero-software-cell-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.4);
+}
+
+@media (max-width: 860px) {
+  .hero-software-grid { gap: 6px; }
+}
+
 .hero-all-cta {
   display: none;
   flex-shrink: 0;
